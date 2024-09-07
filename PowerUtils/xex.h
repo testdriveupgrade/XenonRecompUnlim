@@ -123,4 +123,5 @@ inline static const T* Xex2FindOptionalHeader(const XEX_HEADER* header, _XEX_OPT
     return Xex2FindOptionalHeader<T>(header, (XEX_OPTIONAL_HEADER*)(header + 1), header->NumberOfOptionalHeaders, type);
 }
 
-std::unique_ptr<uint8_t[]> Xex2LoadImage(const uint8_t* data);
+struct Image;
+Image Xex2LoadImage(const uint8_t* data);
