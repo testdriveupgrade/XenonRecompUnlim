@@ -4,35 +4,35 @@
 #include <bit>
 
 #ifdef _WIN32
-	#include <windows.h>
+    #include <windows.h>
 #else
-	#define near
-	#define far
+    #define near
+    #define far
 
-	typedef char CHAR;
-	typedef wchar_t WCHAR;
-	typedef unsigned long DWORD;
-	typedef int BOOL;
-	typedef unsigned char BYTE;
-	typedef unsigned short WORD;
-	typedef float FLOAT;
-	typedef FLOAT* PFLOAT;
-	typedef BOOL near* PBOOL;
-	typedef BOOL far* LPBOOL;
-	typedef BYTE near* PBYTE;
-	typedef BYTE far* LPBYTE;
-	typedef int near* PINT;
-	typedef int far* LPINT;
-	typedef WORD near* PWORD;
-	typedef WORD far* LPWORD;
-	typedef long far* LPLONG;
-	typedef DWORD near* PDWORD;
-	typedef DWORD far* LPDWORD;
-	typedef void far* LPVOID;
-	typedef const void far* LPCVOID;
+    typedef char CHAR;
+    typedef wchar_t WCHAR;
+    typedef unsigned long DWORD;
+    typedef int BOOL;
+    typedef unsigned char BYTE;
+    typedef unsigned short WORD;
+    typedef float FLOAT;
+    typedef FLOAT* PFLOAT;
+    typedef BOOL near* PBOOL;
+    typedef BOOL far* LPBOOL;
+    typedef BYTE near* PBYTE;
+    typedef BYTE far* LPBYTE;
+    typedef int near* PINT;
+    typedef int far* LPINT;
+    typedef WORD near* PWORD;
+    typedef WORD far* LPWORD;
+    typedef long far* LPLONG;
+    typedef DWORD near* PDWORD;
+    typedef DWORD far* LPDWORD;
+    typedef void far* LPVOID;
+    typedef const void far* LPCVOID;
     typedef unsigned long ULONG;
     typedef ULONG* PULONG;
-	typedef signed long LONG;
+    typedef signed long LONG;
     typedef LONG* PLONG;
     typedef unsigned long long ULONGLONG;
     typedef ULONGLONG* PULONGLONG;
