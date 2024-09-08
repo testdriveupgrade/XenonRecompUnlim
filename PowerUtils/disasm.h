@@ -1,43 +1,27 @@
 #pragma once
-#include <capstone/capstone.h>
-
-struct DisassemblerEngine
-{
-    csh handle{};
-
-    DisassemblerEngine(const DisassemblerEngine&) = default;
-    DisassemblerEngine& operator=(const DisassemblerEngine&) = delete;
-
-    DisassemblerEngine(cs_arch arch, cs_mode mode);
-    ~DisassemblerEngine();
-    size_t Disassemble(const uint8_t* code, size_t size, uint64_t base, size_t count, cs_insn** instructions) const;
-    void SetOption(cs_opt_type option, size_t value);
-
-    void SetDetail(bool value)
-    {
-        SetOption(CS_OPT_DETAIL, value);
-    }
-};
+#include <dis-asm.h>
 
 namespace ppc
 {
-    extern DisassemblerEngine gPPCBigEndianDisassembler;
-
-    static size_t Disassemble(const uint8_t* code, size_t size, uint64_t base, size_t count, cs_insn** instructions)
+    struct DisassemblerEngine
     {
-        return gPPCBigEndianDisassembler.Disassemble(code, size, base, count, instructions);
-    }
+        disassemble_info info{};
+        DisassemblerEngine(const DisassemblerEngine&) = default;
+        DisassemblerEngine& operator=(const DisassemblerEngine&) = delete;
 
-    static cs_insn* DisassembleSingle(const uint8_t* code, uint64_t base)
+        DisassemblerEngine(bfd_endian endian, const char* options);
+        ~DisassemblerEngine() = default;
+
+        /**
+         * \return Numbers of bytes decoded
+         */
+        int Disassemble(const void* code, size_t size, uint64_t base, ppc_insn& out);
+    };
+
+    thread_local extern DisassemblerEngine gBigEndianDisassembler;
+
+    static int Disassemble(const void* code, size_t size, uint64_t base, ppc_insn& out)
     {
-        cs_insn* instruction{};
-        gPPCBigEndianDisassembler.Disassemble(code, 4, base, 1, &instruction);
-
-        return instruction;
-    }
-
-    static void SetDetail(bool value)
-    {
-        gPPCBigEndianDisassembler.SetDetail(value);
+        return gBigEndianDisassembler.Disassemble(code, size, base, out);
     }
 }

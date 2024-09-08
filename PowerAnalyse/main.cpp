@@ -25,21 +25,21 @@ int main()
 
         if (section.flags & SectionFlags_Code)
         {
+            ppc_insn insn;
             while(base < end)
             {
-                auto* instruction = ppc::DisassembleSingle(reinterpret_cast<uint8_t*>(data), base);
-
+                ppc::Disassemble(data, 4, base, insn);
+                
                 base += 4;
                 ++data;
 
-                if (instruction == nullptr)
+                if (insn.opcode == nullptr)
                 {
-                    printf("\t%X\t.long %Xh\n", static_cast<uint32_t>(base - 4), *(data - 1));
+                    printf("\t%X\t%s\n", static_cast<uint32_t>(base - 4), insn.op_str);
                 }
                 else
                 {
-                    std::printf("\t%X\t%s %s\n", static_cast<uint32_t>(base - 4), instruction->mnemonic, instruction->op_str);
-                    cs_free(instruction, 1);
+                    std::printf("\t%X\t%s %s\n", static_cast<uint32_t>(base - 4), insn.opcode->name, insn.op_str);
                 }
             }
         }

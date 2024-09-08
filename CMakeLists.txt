@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.20)
+cmake_minimum_required (VERSION 3.20)
 set(THIRDPARTY_ROOT ${CMAKE_SOURCE_DIR}/thirdparty)
 set(CMAKE_CXX_STANDARD 23)
 
@@ -10,8 +10,7 @@ endif()
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-add_subdirectory(${THIRDPARTY_ROOT}/capstone)
-include_directories(${THIRDPARTY_ROOT}/capstone/include)
+add_subdirectory(${THIRDPARTY_ROOT}/disasm)
 
 project ("PowerRecomp-ALL")
 

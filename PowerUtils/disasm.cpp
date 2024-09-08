@@ -1,23 +1,24 @@
 #include "disasm.h"
 
-DisassemblerEngine ppc::gPPCBigEndianDisassembler{ CS_ARCH_PPC, CS_MODE_BIG_ENDIAN };
+thread_local ppc::DisassemblerEngine ppc::gBigEndianDisassembler{ BFD_ENDIAN_BIG, "cell 32"};
 
-DisassemblerEngine::DisassemblerEngine(cs_arch arch, cs_mode mode)
+ppc::DisassemblerEngine::DisassemblerEngine(bfd_endian endian, const char* options)
 {
-    cs_open(arch, mode, &handle);
+    INIT_DISASSEMBLE_INFO(info, stdout, fprintf);
+    info.arch = bfd_arch_powerpc;
+    info.endian = endian;
+    info.disassembler_options = options;
 }
 
-size_t DisassemblerEngine::Disassemble(const uint8_t* code, size_t size, uint64_t base, size_t count, cs_insn** instructions) const
+int ppc::DisassemblerEngine::Disassemble(const void* code, size_t size, uint64_t base, ppc_insn& out)
 {
-    return cs_disasm(handle, code, size, base, count, instructions);
-}
+    if (size < 4)
+    {
+        return 0;
+    }
 
-void DisassemblerEngine::SetOption(cs_opt_type option, size_t value)
-{
-    cs_option(handle, option, value);
-}
-
-DisassemblerEngine::~DisassemblerEngine()
-{
-    cs_close(&handle);
+    info.buffer = (bfd_byte*)code;
+    info.buffer_vma = base;
+    info.buffer_length = size;
+    return decode_insn_ppc(base, &info, &out);
 }
