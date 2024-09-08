@@ -5,21 +5,19 @@
 
 void Image::Map(const std::string_view& name, size_t base, uint32_t size, uint8_t flags, uint8_t* data)
 {
-    sections.emplace_back(std::string(name), this->base + base, 
+    sections.emplace(std::string(name), this->base + base, 
         size, static_cast<SectionFlags>(flags), data);
 }
 
 const void* Image::Find(size_t address) const
 {
-    for (const auto& section : sections)
+    const auto section = sections.find(address);
+    if (section == sections.end())
     {
-        if (section == address)
-        {
-            return section.data + (address - section.base);
-        }
+        return nullptr;
     }
 
-    return nullptr;
+    return section->data + (address - section->base);
 }
 
 std::expected<Image, int> Image::ParseImage(const uint8_t* data, size_t size)
@@ -44,6 +42,7 @@ Image ElfLoadImage(const uint8_t* data, size_t size)
     Image image{};
     image.size = size;
     image.data = std::make_unique<uint8_t[]>(size);
+    image.entry_point = std::byteswap(header->e_entry);
     memcpy(image.data.get(), data, size);
 
     auto stringTableIndex = std::byteswap(header->e_shstrndx);
@@ -58,7 +57,7 @@ Image ElfLoadImage(const uint8_t* data, size_t size)
     {
         if (psections[i].p_type == std::byteswap((Elf32_Word)PT_LOAD))
         {
-            image.base = psections[i].p_vaddr;
+            image.base = std::byteswap(psections[i].p_vaddr);
             break;
         }
     }
@@ -68,7 +67,7 @@ Image ElfLoadImage(const uint8_t* data, size_t size)
     for (size_t i = 0; i < numSections; i++)
     {
         const auto& section = sections[i];
-        if (section.sh_type == 0)
+        if (section.sh_type == 0 || section.sh_addr == 0)
         {
             continue;
         }

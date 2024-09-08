@@ -4,9 +4,15 @@
 
 int main()
 {
-    // TODO: ELFs, symbols, sections, a lot
     const auto file = LoadFile("add.elf");
-    const auto image = Image::ParseImage(file.data(), file.size()).value();
+    auto image = Image::ParseImage(file.data(), file.size()).value();
+    
+    for (const auto& section : image.sections)
+    {
+        image.symbols.emplace(section.name, section.base, section.size, Symbol_Section);
+    }
+
+    image.symbols.emplace("_start", image.entry_point, 0x30, Symbol_Function);
 
     for (const auto& section : image.sections)
     {
@@ -16,8 +22,6 @@ int main()
         auto* data = (uint32_t*)section.data;
         auto base = section.base;
         const auto end = section.base + section.size;
-
-        ppc::SetDetail(true);
 
         if (section.flags & SectionFlags_Code)
         {
