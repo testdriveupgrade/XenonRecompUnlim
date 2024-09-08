@@ -12,7 +12,7 @@ int main()
         image.symbols.emplace(section.name, section.base, section.size, Symbol_Section);
     }
 
-    image.symbols.emplace("_start", image.entry_point, 0x30, Symbol_Function);
+    // image.symbols.emplace("_start", image.entry_point, 0x30, Symbol_Function);
 
     for (const auto& section : image.sections)
     {
