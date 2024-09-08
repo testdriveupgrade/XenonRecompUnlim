@@ -5405,6 +5405,7 @@ static int decode_insn_powerpc(bfd_vma memaddr, disassemble_info* info, int bige
     if (dialect == 0)
         dialect = powerpc_dialect(info);
 
+    oinsn->op_str[0] = 0;
     status = (*info->read_memory_func) (memaddr, buffer, 4, info);
     if (status != 0)
     {
