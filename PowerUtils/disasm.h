@@ -24,4 +24,9 @@ namespace ppc
     {
         return gBigEndianDisassembler.Disassemble(code, size, base, out);
     }
+
+    static int Disassemble(const void* code, uint64_t base, ppc_insn& out)
+    {
+        return Disassemble(code, 4, base, out);
+    }
 }

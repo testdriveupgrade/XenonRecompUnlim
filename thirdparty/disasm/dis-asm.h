@@ -410,6 +410,9 @@ typedef struct powerpc_opcode
        operand table.  They appear in the order which the operands must
        appear in assembly code, and are terminated by a zero.  */
     unsigned char operands[8];
+
+    /* The opcode ID. */
+    int id;
 } powerpc_opcode;
 
 typedef struct ppc_insn
