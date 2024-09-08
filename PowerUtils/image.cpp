@@ -26,7 +26,7 @@ std::expected<Image, int> Image::ParseImage(const uint8_t* data, size_t size)
     {
         return ElfLoadImage(data, size);
     }
-    else if (data[0] == 'X' && data[1] == 'E' && data[0] == 'X' && data[0] == '2')
+    else if (data[0] == 'X' && data[1] == 'E' && data[2] == 'X' && data[3] == '2')
     {
         return Xex2LoadImage(data);
     }
