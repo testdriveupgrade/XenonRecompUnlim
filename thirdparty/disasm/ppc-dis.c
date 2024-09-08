@@ -88,6 +88,9 @@ extern const int powerpc_num_opcodes;
 /* Opcode is supported by Altivec Vector Unit */
 #define PPC_OPCODE_ALTIVEC	     0x200
 
+/* Opcode is supported by VMX128 Vector Extension */
+#define PPC_OPCODE_VMX_128	  0x1000000
+
 /* Opcode is supported by PowerPC 403 processor.  */
 #define PPC_OPCODE_403		     0x400
 
@@ -388,6 +391,14 @@ static unsigned long insert_sprg(unsigned long, long, int, const char**);
 static long extract_sprg(unsigned long, int, int*);
 static unsigned long insert_tbr(unsigned long, long, int, const char**);
 static long extract_tbr(unsigned long, int, int*);
+static unsigned long insert_vds128(unsigned long, long, int, const char**);
+static long extract_vds128(unsigned long, int, int*);
+static unsigned long insert_va128(unsigned long, long, int, const char**);
+static long extract_va128(unsigned long, int, int*);
+static unsigned long insert_vb128(unsigned long, long, int, const char**);
+static long extract_vb128(unsigned long, int, int*);
+static unsigned long insert_vperm(unsigned long, long, int, const char**);
+static long extract_vperm(unsigned long, int, int*);
 
 /* The operands table.
 
@@ -806,8 +817,42 @@ const struct powerpc_operand powerpc_operands[] =
                           #define VS VD
                             { 0x1f, 21, NULL, NULL, PPC_OPERAND_VR },
 
+                          #define VD128 VD + 1
+                           #define VS128 VD128
+                           #define VD128_MASK (0x1f << 21)
+                           { 7, 0, insert_vds128, extract_vds128, PPC_OPERAND_VR },
+                          
+                            /* The VA128 field in a VA, VX, VXR or X form instruction. */
+                          #define VA128 VD128 + 1
+                           #define VA128_MASK (0x1f << 21)
+                           { 7, 0, insert_va128, extract_va128, PPC_OPERAND_VR },
+                          
+                            /* The VB128 field in a VA, VX, VXR or X form instruction. */
+                          #define VB128 VA128 + 1
+                           #define VB128_MASK (0x1f << 21)
+                           { 7, 0, insert_vb128, extract_vb128, PPC_OPERAND_VR },
+                          
+                            /* The VC128 field in a VA, VX, VXR or X form instruction. */
+                          #define VC128 VB128 + 1
+                           #define VC128_MASK (0x1f << 21)
+                           { 3, 6, NULL, NULL, PPC_OPERAND_VR },
+                          
+                            /* The VPERM field in a VPERM128 form instruction. */
+                          #define VPERM128 VC128 + 1
+                           #define VPERM_MASK (0x1f << 21)
+                           { 8, 0, insert_vperm, extract_vperm, 0 },
+                          
+                          #define VD3D0 VPERM128 + 1
+                           { 3, 18, NULL, NULL, 0 },
+                          
+                          #define VD3D1 VD3D0 + 1
+                           { 2, 16, NULL, NULL, 0 },
+                          
+                          #define VD3D2 VD3D1 + 1
+                           { 2, 6, NULL, NULL, 0 },
+
                             /* The SIMM field in a VX form instruction.  */
-                          #define SIMM VD + 1
+                          #define SIMM VD3D2 + 1
                             { 0x1f, 16, NULL, NULL, PPC_OPERAND_SIGNED},
 
                             /* The UIMM field in a VX form instruction, and TE in Z form.  */
@@ -1562,6 +1607,85 @@ extract_tbr(unsigned long insn,
     return ret;
 }
 
+/* The VD128 or VS128 field in an VX128 form instruction.  This is split.  */
+
+static unsigned long
+insert_vds128 (unsigned long insn,
+	   long value,
+	   int dialect ATTRIBUTE_UNUSED,
+	   const char **errmsg ATTRIBUTE_UNUSED)
+{
+
+  return insn | ((value & 0x60) >> 3) | ((value & 0x1f) << 21);
+}
+
+static long
+extract_vds128 (unsigned long insn,
+	    int dialect ATTRIBUTE_UNUSED,
+	    int *invalid ATTRIBUTE_UNUSED)
+{
+  return ((insn << 3) & 0x60) | ((insn >> 21) & 0x1f);
+}
+
+/* The VA128 field in an VX128 form instruction.  This is split.  */
+
+static unsigned long
+insert_va128 (unsigned long insn,
+	   long value,
+	   int dialect ATTRIBUTE_UNUSED,
+	   const char **errmsg ATTRIBUTE_UNUSED)
+{
+  return insn | ((value & 0x40) << 4) | (value & 0x20) 
+    | ((value & 0x1f) << 16);
+}
+
+static long
+extract_va128 (unsigned long insn,
+	    int dialect ATTRIBUTE_UNUSED,
+	    int *invalid ATTRIBUTE_UNUSED)
+{
+  return ((insn >> 4) & 0x40) | (insn & 0x20) | ((insn >> 16) & 0x1f);
+}
+
+/* The VB128 field in an VX128 form instruction.  This is split.  */
+
+static unsigned long
+insert_vb128 (unsigned long insn,
+	   long value,
+	   int dialect ATTRIBUTE_UNUSED,
+	   const char **errmsg ATTRIBUTE_UNUSED)
+{
+  return insn | ((value & 0x60) >> 5) | ((value & 0x1f) << 11);
+}
+
+static long
+extract_vb128 (unsigned long insn,
+	    int dialect ATTRIBUTE_UNUSED,
+	    int *invalid ATTRIBUTE_UNUSED)
+{
+  return ((insn << 5) & 0x60) | ((insn >> 11) & 0x1f);
+}
+
+/* The VPERM field in an VX128 form instruction.  This is split.  */
+
+static unsigned long
+insert_vperm (unsigned long insn,
+	   long value,
+	   int dialect ATTRIBUTE_UNUSED,
+	   const char **errmsg ATTRIBUTE_UNUSED)
+{
+  return insn | ((value & 0xe0) << 1) | ((value & 0x1f) << 16);
+}
+
+static long
+extract_vperm (unsigned long insn,
+	    int dialect ATTRIBUTE_UNUSED,
+	    int *invalid ATTRIBUTE_UNUSED)
+{
+  return ((insn >> 1) & 0xe0) | ((insn >> 16) & 0x1f);
+}
+
+
 /* Macros used to form opcodes.  */
 
 /* The main opcode.  */
@@ -1702,6 +1826,39 @@ extract_tbr(unsigned long insn,
 
 /* The mask for a VXR form instruction.  */
 #define VXR_MASK VXR(0x3f, 0x3ff, 1)
+
+/* An VX128 form instruction. */
+#define VX128(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x3d0))
+
+/* The mask for an VX form instruction. */
+#define VX128_MASK	VX(0x3f, 0x3d0)
+
+/* An VX128 form instruction. */
+#define VX128_1(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x7f3))
+
+/* The mask for an VX form instruction. */
+#define VX128_1_MASK	VX(0x3f, 0x7f3)
+
+/* An VX128 form instruction. */
+#define VX128_2(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x210))
+
+/* The mask for an VX form instruction. */
+#define VX128_2_MASK	VX(0x3f, 0x210)
+
+/* An VX128 form instruction. */
+#define VX128_3(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x7f0))
+
+/* The mask for an VX form instruction. */
+#define VX128_3_MASK	VX(0x3f, 0x7f0)
+
+#define VX128_P(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x630))
+#define VX128_P_MASK	VX(0x3f, 0x630)
+
+#define VX128_4(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x730))
+#define VX128_4_MASK	VX(0x3f, 0x730)
+
+#define VX128_5(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x10))
+#define VX128_5_MASK	VX(0x3f, 0x10)
 
 /* An X form instruction.  */
 #define X(op, xop) (OP (op) | ((((unsigned long)(xop)) & 0x3ff) << 1))
@@ -1939,6 +2096,7 @@ extract_tbr(unsigned long insn,
 #define PPC750	PPC
 #define PPC860	PPC
 #define PPCVEC	PPC_OPCODE_ALTIVEC
+#define PPCVEC128 PPC_OPCODE_VMX_128
 #define	POWER   PPC_OPCODE_POWER
 #define	POWER2	PPC_OPCODE_POWER | PPC_OPCODE_POWER2
 #define PPCPWR2	PPC_OPCODE_PPC | PPC_OPCODE_POWER | PPC_OPCODE_POWER2
@@ -2305,6 +2463,90 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 { "vupklsb",   VX(4,  654), VX_MASK,	PPCVEC,		{ VD, VB }, PPC_INST_VUPKLSB },
 { "vupklsh",   VX(4,  718), VX_MASK,	PPCVEC,		{ VD, VB }, PPC_INST_VUPKLSH },
 { "vxor",      VX(4, 1220), VX_MASK,	PPCVEC,		{ VD, VA, VB }, PPC_INST_VXOR },
+
+{ "vsldoi128", VX128_5(4, 16), VX128_5_MASK, PPCVEC128, { VD128, VA128, VB128, SHB } },
+{ "lvsl128", VX128_1(4, 3), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "lvsr128", VX128_1(4, 67), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "lvewx128", VX128_1(4, 131), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "lvx128", VX128_1(4, 195), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "stvewx128", VX128_1(4, 387), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+{ "stvx128", VX128_1(4, 451), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+{ "lvxl128", VX128_1(4, 707), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "stvxl128", VX128_1(4, 963), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+{ "lvlx128", VX128_1(4, 1027), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "lvrx128", VX128_1(4, 1091), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "stvlx128", VX128_1(4, 1283), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+{ "stvrx128", VX128_1(4, 1347), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+{ "lvlxl128", VX128_1(4, 1539), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "lvrxl128", VX128_1(4, 1603), VX128_1_MASK, PPCVEC128, { VD128, RA, RB } },
+{ "stvlxl128", VX128_1(4, 1795), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+{ "stvrxl128", VX128_1(4, 1859), VX128_1_MASK, PPCVEC128, { VS128, RA, RB } },
+
+{ "vperm128", VX128_2(5, 0), VX128_2_MASK, PPCVEC128, { VD128, VA128, VB128, VC128 } },
+{ "vaddfp128", VX128(5, 16), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vsubfp128", VX128(5, 80), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vmulfp128", VX128(5, 144), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vmaddfp128", VX128(5, 208), VX128_MASK, PPCVEC128, { VD128, VA128, VB128, VS128 } },
+{ "vmaddcfp128", VX128(5, 272), VX128_MASK, PPCVEC128, { VD128, VA128, VS128, VB128 } },
+{ "vnmsubfp128", VX128(5, 336), VX128_MASK, PPCVEC128, { VD128, VA128, VB128, VS128 } },
+{ "vmsum3fp128", VX128(5, 400), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vmsum4fp128", VX128(5, 464), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkshss128", VX128(5, 512), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vand128", VX128(5, 528), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkshus128", VX128(5, 576), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vandc128", VX128(5, 592), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkswss128", VX128(5, 640), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vnor128", VX128(5, 656), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkswus128", VX128(5, 704), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vor128", VX128(5, 720), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkuhum128", VX128(5, 768), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vxor128", VX128(5, 784), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkuhus128", VX128(5, 832), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vsel128", VX128(5, 848), VX128_MASK, PPCVEC128, { VD128, VA128, VB128, VS128 } },
+{ "vpkuwum128", VX128(5, 896), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vslo128", VX128(5, 912), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vpkuwus128", VX128(5, 960), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vsro128", VX128(5, 976), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+
+{ "vpermwi128", VX128_P(6, 528), VX128_P_MASK, PPCVEC128, { VD128, VB128, VPERM128 } },
+{ "vcfpsxws128", VX128_3(6, 560), VX128_3_MASK, PPCVEC128, { VD128, VB128, SIMM } },
+{ "vcfpuxws128", VX128_3(6, 624), VX128_3_MASK, PPCVEC128, { VD128, VB128, UIMM } },
+{ "vcsxwfp128", VX128_3(6, 688), VX128_3_MASK, PPCVEC128, { VD128, VB128, SIMM } },
+{ "vcuxwfp128", VX128_3(6, 752), VX128_3_MASK, PPCVEC128, { VD128, VB128, UIMM } },
+{ "vrfim128", VX128_3(6, 816), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vrfin128", VX128_3(6, 880), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vrfip128", VX128_3(6, 944), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vrfiz128", VX128_3(6, 1008), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vpkd3d128", VX128_4(6, 1552), VX128_4_MASK, PPCVEC128, { VD128, VB128, VD3D0, VD3D1, VD3D2 } },
+{ "vrefp128", VX128_3(6, 1584), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vrsqrtefp128", VX128_3(6, 1648), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vexptefp128", VX128_3(6, 1712), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vlogefp128", VX128_3(6, 1776), VX128_3_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vrlimi128", VX128_4(6, 1808), VX128_4_MASK, PPCVEC128, { VD128, VB128, UIMM, VD3D2 } },
+{ "vspltw128", VX128_3(6, 1840), VX128_3_MASK, PPCVEC128, { VD128, VB128, UIMM } },
+{ "vspltisw128", VX128_3(6, 1904), VX128_3_MASK, PPCVEC128, { VD128, VB128, SIMM } },
+{ "vupkd3d128", VX128_3(6, 2032), VX128_3_MASK, PPCVEC128, { VD128, VB128, UIMM } },
+{ "vcmpeqfp128", VX128(6, 0), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpeqfp128.", VX128(6, 64), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vrlw128", VX128(6, 80), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpgefp128", VX128(6, 128), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpgefp128.", VX128(6, 192), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vslw128", VX128(6, 208), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpgtfp128", VX128(6, 256), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpgtfp128.", VX128(6, 320), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vsraw128", VX128(6, 336), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpbfp128", VX128(6, 384), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpbfp128.", VX128(6, 448), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vsrw128", VX128(6, 464), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpequw128", VX128(6, 512), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vcmpequw128.", VX128(6, 576), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vmaxfp128", VX128(6, 640), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vminfp128", VX128(6, 704), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vmrghw128", VX128(6, 768), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vmrglw128", VX128(6, 832), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 } },
+{ "vupkhsb128", VX128(6, 896), VX128_MASK, PPCVEC128, { VD128, VB128 } },
+{ "vupklsb128", VX128(6, 960), VX128_MASK, PPCVEC128, { VD128, VB128 } },
+
 
 { "evaddw",    VX(4, 512), VX_MASK,	PPCSPE,		{ RS, RA, RB }, PPC_INST_EVADDW },
 { "evaddiw",   VX(4, 514), VX_MASK,	PPCSPE,		{ RS, RB, UIMM }, PPC_INST_EVADDIW },
@@ -4585,14 +4827,14 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 { "stvxl",   X(31, 487), X_MASK,	PPCVEC,		{ VS, RA, RB }, PPC_INST_STVXL },
 
 /* New load/store left/right index vector instructions that are in the Cell only.  */
-{ "lvlx",    X(31, 519), X_MASK,	CELL,		{ VD, RA0, RB }, PPC_INST_LVLX },
-{ "lvlxl",   X(31, 775), X_MASK,	CELL,		{ VD, RA0, RB }, PPC_INST_LVLXL },
-{ "lvrx",    X(31, 551), X_MASK,	CELL,		{ VD, RA0, RB }, PPC_INST_LVRX },
-{ "lvrxl",   X(31, 807), X_MASK,	CELL,		{ VD, RA0, RB }, PPC_INST_LVRXL },
-{ "stvlx",   X(31, 647), X_MASK,	CELL,		{ VS, RA0, RB }, PPC_INST_STVLX },
-{ "stvlxl",  X(31, 903), X_MASK,	CELL,		{ VS, RA0, RB }, PPC_INST_STVLXL },
-{ "stvrx",   X(31, 679), X_MASK,	CELL,		{ VS, RA0, RB }, PPC_INST_STVRX },
-{ "stvrxl",  X(31, 935), X_MASK,	CELL,		{ VS, RA0, RB }, PPC_INST_STVRXL },
+{ "lvlx",    X(31, 519), X_MASK,	CELL | PPCVEC128,		{ VD, RA0, RB }, PPC_INST_LVLX },
+{ "lvlxl",   X(31, 775), X_MASK,	CELL | PPCVEC128,		{ VD, RA0, RB }, PPC_INST_LVLXL },
+{ "lvrx",    X(31, 551), X_MASK,	CELL | PPCVEC128,		{ VD, RA0, RB }, PPC_INST_LVRX },
+{ "lvrxl",   X(31, 807), X_MASK,	CELL | PPCVEC128,		{ VD, RA0, RB }, PPC_INST_LVRXL },
+{ "stvlx",   X(31, 647), X_MASK,	CELL | PPCVEC128,		{ VS, RA0, RB }, PPC_INST_STVLX },
+{ "stvlxl",  X(31, 903), X_MASK,	CELL | PPCVEC128,		{ VS, RA0, RB }, PPC_INST_STVLXL },
+{ "stvrx",   X(31, 679), X_MASK,	CELL | PPCVEC128,		{ VS, RA0, RB }, PPC_INST_STVRX },
+{ "stvrxl",  X(31, 935), X_MASK,	CELL | PPCVEC128,		{ VS, RA0, RB }, PPC_INST_STVRXL },
 
 { "lwz",     OP(32),	OP_MASK,	PPCCOM,		{ RT, D, RA0 }, PPC_INST_LWZ },
 { "l",	     OP(32),	OP_MASK,	PWRCOM,		{ RT, D, RA0 }, PPC_INST_L },
@@ -5110,7 +5352,7 @@ powerpc_dialect(struct disassemble_info* info)
 
     if (info->disassembler_options
         && strstr(info->disassembler_options, "cell") != NULL)
-        dialect |= PPC_OPCODE_POWER4 | PPC_OPCODE_CELL | PPC_OPCODE_ALTIVEC;
+        dialect |= PPC_OPCODE_POWER4 | PPC_OPCODE_CELL | PPC_OPCODE_ALTIVEC | PPC_OPCODE_VMX_128;
 
     if (info->disassembler_options
         && strstr(info->disassembler_options, "power6") != NULL)

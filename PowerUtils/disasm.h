@@ -1,5 +1,6 @@
 #pragma once
 #include <dis-asm.h>
+#include <ppc.h>
 
 namespace ppc
 {
