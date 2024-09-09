@@ -124,9 +124,8 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
             {
                 blockStack.pop_back();
 
-                // single block with a branch means it'd be a tail call
-                // we don't have to analyze the target in that case
-                if (op == PPC_OP_B && blocks.size() != 1)
+                // Keep analyzing if we have continuity
+                if (op == PPC_OP_B)
                 {
                     const auto branchBase = insn.operands[0] - base;
                     const auto branchBlock = fn.SearchBlock(insn.operands[0]);
@@ -138,12 +137,12 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                     if (isContinious && curBlock.projectedSize != -1)
                     {
                         sizeProjection = curBlock.projectedSize - curBlock.size;
-                    }
 
-                    if (branchBlock == -1)
-                    {
-                        blocks.emplace_back(branchBase, 0, sizeProjection);
-                        blockStack.emplace_back(blocks.size() - 1);
+                        if (branchBlock == -1)
+                        {
+                            blocks.emplace_back(branchBase, 0, sizeProjection);
+                            blockStack.emplace_back(blocks.size() - 1);
+                        }
                     }
                 }
 
