@@ -131,6 +131,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                     const auto branchBase = insn.operands[0] - base;
                     const auto branchBlock = fn.SearchBlock(insn.operands[0]);
 
+                    // carry over our projection if blocks are next to each other
                     const auto isContinious = branchBase == curBlock.base + curBlock.size;
                     auto sizeProjection = (size_t)-1;
 

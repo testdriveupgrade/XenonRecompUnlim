@@ -1,13 +1,14 @@
 #pragma once
+#include <expected>
 #include <vector>
 
-inline static std::vector<uint8_t> LoadFile(const char* path)
+inline static std::expected<std::vector<uint8_t>, int> LoadFile(const char* path)
 {
     std::vector<uint8_t> data{};
     auto* stream = fopen(path, "rb");
     if (stream == nullptr)
     {
-        return data;
+        return std::unexpected(1);
     }
 
     fseek(stream, 0, SEEK_END);
