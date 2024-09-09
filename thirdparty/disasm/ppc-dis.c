@@ -145,9 +145,6 @@ extern const int powerpc_num_opcodes;
 /* Opcode is only supported by PowerPC Cell family.  */
 #define PPC_OPCODE_CELL		 0x8000000
 
-/* A macro to extract the major opcode from an instruction.  */
-#define PPC_OP(i) (((i) >> 26) & 0x3f)
-
 /* The operands table is an array of struct powerpc_operand.  */
 
 struct powerpc_operand
@@ -1611,9 +1608,9 @@ extract_tbr(unsigned long insn,
 
 static unsigned long
 insert_vds128 (unsigned long insn,
-	   long value,
-	   int dialect ATTRIBUTE_UNUSED,
-	   const char **errmsg ATTRIBUTE_UNUSED)
+       long value,
+       int dialect ATTRIBUTE_UNUSED,
+       const char **errmsg ATTRIBUTE_UNUSED)
 {
 
   return insn | ((value & 0x60) >> 3) | ((value & 0x1f) << 21);
@@ -1621,8 +1618,8 @@ insert_vds128 (unsigned long insn,
 
 static long
 extract_vds128 (unsigned long insn,
-	    int dialect ATTRIBUTE_UNUSED,
-	    int *invalid ATTRIBUTE_UNUSED)
+        int dialect ATTRIBUTE_UNUSED,
+        int *invalid ATTRIBUTE_UNUSED)
 {
   return ((insn << 3) & 0x60) | ((insn >> 21) & 0x1f);
 }
@@ -1631,9 +1628,9 @@ extract_vds128 (unsigned long insn,
 
 static unsigned long
 insert_va128 (unsigned long insn,
-	   long value,
-	   int dialect ATTRIBUTE_UNUSED,
-	   const char **errmsg ATTRIBUTE_UNUSED)
+       long value,
+       int dialect ATTRIBUTE_UNUSED,
+       const char **errmsg ATTRIBUTE_UNUSED)
 {
   return insn | ((value & 0x40) << 4) | (value & 0x20) 
     | ((value & 0x1f) << 16);
@@ -1641,8 +1638,8 @@ insert_va128 (unsigned long insn,
 
 static long
 extract_va128 (unsigned long insn,
-	    int dialect ATTRIBUTE_UNUSED,
-	    int *invalid ATTRIBUTE_UNUSED)
+        int dialect ATTRIBUTE_UNUSED,
+        int *invalid ATTRIBUTE_UNUSED)
 {
   return ((insn >> 4) & 0x40) | (insn & 0x20) | ((insn >> 16) & 0x1f);
 }
@@ -1651,17 +1648,17 @@ extract_va128 (unsigned long insn,
 
 static unsigned long
 insert_vb128 (unsigned long insn,
-	   long value,
-	   int dialect ATTRIBUTE_UNUSED,
-	   const char **errmsg ATTRIBUTE_UNUSED)
+       long value,
+       int dialect ATTRIBUTE_UNUSED,
+       const char **errmsg ATTRIBUTE_UNUSED)
 {
   return insn | ((value & 0x60) >> 5) | ((value & 0x1f) << 11);
 }
 
 static long
 extract_vb128 (unsigned long insn,
-	    int dialect ATTRIBUTE_UNUSED,
-	    int *invalid ATTRIBUTE_UNUSED)
+        int dialect ATTRIBUTE_UNUSED,
+        int *invalid ATTRIBUTE_UNUSED)
 {
   return ((insn << 5) & 0x60) | ((insn >> 11) & 0x1f);
 }
@@ -1670,17 +1667,17 @@ extract_vb128 (unsigned long insn,
 
 static unsigned long
 insert_vperm (unsigned long insn,
-	   long value,
-	   int dialect ATTRIBUTE_UNUSED,
-	   const char **errmsg ATTRIBUTE_UNUSED)
+       long value,
+       int dialect ATTRIBUTE_UNUSED,
+       const char **errmsg ATTRIBUTE_UNUSED)
 {
   return insn | ((value & 0xe0) << 1) | ((value & 0x1f) << 16);
 }
 
 static long
 extract_vperm (unsigned long insn,
-	    int dialect ATTRIBUTE_UNUSED,
-	    int *invalid ATTRIBUTE_UNUSED)
+        int dialect ATTRIBUTE_UNUSED,
+        int *invalid ATTRIBUTE_UNUSED)
 {
   return ((insn >> 1) & 0xe0) | ((insn >> 16) & 0x1f);
 }
@@ -5665,6 +5662,7 @@ static int decode_insn_powerpc(bfd_vma memaddr, disassemble_info* info, int bige
     else
         insn = bfd_getl32(buffer);
 
+    oinsn->instruction = insn;
     /* Get the major opcode of the instruction.  */
     op = PPC_OP(insn);
 
@@ -5739,6 +5737,15 @@ again:
 
             value = operand_value_powerpc(operand, insn, dialect);
             oinsn->operands[i_op] = value;
+
+            if (operand->flags & PPC_OPERAND_RELATIVE)
+            {
+                oinsn->operands[i_op] += memaddr;
+            }
+            else if (operand->flags & PPC_OPERAND_ABSOLUTE)
+            {
+                oinsn->operands[i_op] &= 0xffffffff;
+            }
 
             if (need_comma)
             {

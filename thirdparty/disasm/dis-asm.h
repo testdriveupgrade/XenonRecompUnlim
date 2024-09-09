@@ -418,6 +418,7 @@ typedef struct powerpc_opcode
 typedef struct ppc_insn
 {
     const powerpc_opcode* opcode;
+    uint32_t instruction;
     uint32_t operands[8];
     char op_str[160];
 } ppc_insn;
