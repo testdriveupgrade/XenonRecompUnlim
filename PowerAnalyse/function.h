@@ -1,18 +1,21 @@
 #pragma once
 #include <vector>
 
-struct function
+struct Function
 {
-    struct block
+    struct Block
     {
-        size_t base;
-        size_t size;
+        size_t base{};
+        size_t size{};
+
+        // scratch
+        size_t projectedSize{ static_cast<size_t>(-1) };
     };
 
     size_t base{};
     size_t size{};
-    std::vector<block> blocks{};
+    std::vector<Block> blocks{};
 
     size_t SearchBlock(size_t address) const;
-    static function Analyze(const void* code, size_t size, size_t base);
+    static Function Analyze(const void* code, size_t size, size_t base);
 };

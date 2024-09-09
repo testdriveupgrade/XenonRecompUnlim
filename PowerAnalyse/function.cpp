@@ -3,7 +3,7 @@
 #include <vector>
 #include <bit>
 
-size_t function::SearchBlock(size_t address) const
+size_t Function::SearchBlock(size_t address) const
 {
     if (address < base)
     {
@@ -25,17 +25,21 @@ size_t function::SearchBlock(size_t address) const
     return -1;
 }
 
-function function::Analyze(const void* code, size_t size, size_t base)
+Function Function::Analyze(const void* code, size_t size, size_t base)
 {
-    function fn{ base, 0 };
+    Function fn{ base, 0 };
     auto& blocks = fn.blocks;
+    blocks.reserve(8);
     blocks.emplace_back();
 
     const auto* data = (uint32_t*)code;
     const auto* dataStart = data;
     const auto* dataEnd = (uint32_t*)((uint8_t*)code + size);
     std::vector<size_t> blockStack{};
+    blockStack.reserve(32);
     blockStack.emplace_back();
+
+    #define RESTORE_DATA() if (!blockStack.empty()) data = (dataStart + (blocks[blockStack.back()].base / sizeof(*data))) - 1; // continue adds one
 
     // TODO: Branch fallthrough
     for (; data <= dataEnd ; ++data)
@@ -46,6 +50,7 @@ function function::Analyze(const void* code, size_t size, size_t base)
             break; // it's hideover
         }
 
+        auto& curBlock = blocks[blockStack.back()];
         const auto instruction = std::byteswap(*data);
 
         const auto op = PPC_OP(instruction);
@@ -55,12 +60,28 @@ function function::Analyze(const void* code, size_t size, size_t base)
         ppc_insn insn;
         ppc::Disassemble(data, addr, insn);
 
-        blocks[blockStack.back()].size += 4;
+        if (curBlock.base == 0x28)
+        {
+            printf("");
+        }
+
+        if (curBlock.projectedSize != -1 && curBlock.size >= curBlock.projectedSize) // fallthrough
+        {
+            blockStack.pop_back();
+            RESTORE_DATA();
+            continue;
+        }
+
+        curBlock.size += 4;
         if (op == PPC_OP_BC) // conditional branches all originate from one opcode, thanks RISC
         {
-            // this one ends here
-            blockStack.pop_back();
+            if (isLink) // just a conditional call, nothing to see here
+            {
+                continue;
+            }
 
+            curBlock.projectedSize = -1;
+            blockStack.pop_back();
             // true/false paths
             // left block: false case
             // right block: true case
@@ -73,7 +94,7 @@ function function::Analyze(const void* code, size_t size, size_t base)
 
             if (lBlock == -1)
             {
-                blocks.emplace_back(lBase, 0);
+                blocks.emplace_back(lBase, 0).projectedSize = rBase - lBase;
                 lBlock = blocks.size() - 1;
             }
 
@@ -83,21 +104,18 @@ function function::Analyze(const void* code, size_t size, size_t base)
                 blockStack.emplace_back(lBlock);
             }
 
-            if (!isLink) // not a call, scan this too
+            auto rBlock = fn.SearchBlock(base + rBase);
+            if (rBlock == -1)
             {
-                auto rBlock = fn.SearchBlock(base + rBase);
-                if (rBlock == -1)
-                {
-                    blocks.emplace_back(insn.operands[1] - base, 0);
-                    rBlock = blocks.size() - 1;
+                blocks.emplace_back(insn.operands[1] - base, 0);
+                rBlock = blocks.size() - 1;
 
-                    blockStack.emplace_back(rBlock);
-                }
+                blockStack.emplace_back(rBlock);
             }
 
             if (!blockStack.empty())
             {
-                data = (dataStart + (blocks[blockStack.back()].base / sizeof(*data))) - 1; // loop will add one
+                RESTORE_DATA();
             }
         }
         else if (op == PPC_OP_B || (op == PPC_OP_CTR && xop == 16) || instruction == 0) // b, blr, end padding
@@ -113,16 +131,24 @@ function function::Analyze(const void* code, size_t size, size_t base)
                     const auto branchBase = insn.operands[0] - base;
                     const auto branchBlock = fn.SearchBlock(insn.operands[0]);
 
+                    const auto isContinious = branchBase == curBlock.base + curBlock.size;
+                    auto sizeProjection = (size_t)-1;
+
+                    if (isContinious && curBlock.projectedSize != -1)
+                    {
+                        sizeProjection = curBlock.projectedSize - curBlock.size;
+                    }
+
                     if (branchBlock == -1)
                     {
-                        blocks.emplace_back(branchBase, 0);
+                        blocks.emplace_back(branchBase, 0, sizeProjection);
                         blockStack.emplace_back(blocks.size() - 1);
                     }
                 }
 
                 if (!blockStack.empty())
                 {
-                    data = (dataStart + (blocks[blockStack.back()].base / sizeof(*data))) - 1;
+                    RESTORE_DATA();
                 }
             }
         }

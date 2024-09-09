@@ -7,7 +7,7 @@
 
 int main()
 {
-    const auto file = LoadFile("cond.elf");
+    const auto file = LoadFile("cond-fall.elf");
     auto image = Image::ParseImage(file.data(), file.size()).value();
 
     for (const auto& section : image.sections)
@@ -20,7 +20,7 @@ int main()
     //ppc::Disassemble(c, 0x831D6C64, insn);
     //std::println("{:20}{}", insn.opcode->name, insn.op_str);
 
-    std::vector<function> functions;
+    std::vector<Function> functions;
     for (const auto& section : image.sections)
     {
         if (!(section.flags & SectionFlags_Code))
@@ -40,7 +40,7 @@ int main()
                 continue;
             }
 
-            const auto& fn = functions.emplace_back(function::Analyze(data, dataEnd - data, base));
+            const auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
             data += fn.size;
             base += fn.size;
 
