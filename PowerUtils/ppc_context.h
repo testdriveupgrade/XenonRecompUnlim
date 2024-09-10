@@ -9,10 +9,12 @@
 #define _byteswap_uint64 __builtin_bswap64
 #endif
 
+#define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))
 #define PPC_LOAD_U16(x) _byteswap_ushort(*(uint16_t*)(base + (x)))
 #define PPC_LOAD_U32(x) _byteswap_ulong(*(uint32_t*)(base + (x)))
 #define PPC_LOAD_U64(x) _byteswap_uint64(*(uint64_t*)(base + (x)))
 
+#define PPC_STORE_U8(x, y) *(uint8_t*)(base + (x)) = (y)
 #define PPC_STORE_U16(x, y) *(uint16_t*)(base + (x)) = _byteswap_ushort(y)
 #define PPC_STORE_U32(x, y) *(uint32_t*)(base + (x)) = _byteswap_ulong(y)
 #define PPC_STORE_U64(x, y) *(uint64_t*)(base + (x)) = _byteswap_uint64(y)
@@ -34,6 +36,14 @@ struct PPCRegister
     };
 };
 
+struct PPCCRRegister
+{
+    uint8_t lt;
+    uint8_t gt;
+    uint8_t eq;
+    uint8_t so;
+};
+
 typedef float float128[4];
 
 struct PPCContext
@@ -45,16 +55,16 @@ struct PPCContext
     {
         struct
         {
-            uint32_t cr0;
-            uint32_t cr1;
-            uint32_t cr2;
-            uint32_t cr3;
-            uint32_t cr4;
-            uint32_t cr5;
-            uint32_t cr6;
-            uint32_t cr7;
+            PPCCRRegister cr0;
+            PPCCRRegister cr1;
+            PPCCRRegister cr2;
+            PPCCRRegister cr3;
+            PPCCRRegister cr4;
+            PPCCRRegister cr5;
+            PPCCRRegister cr6;
+            PPCCRRegister cr7;
         };
-        uint32_t cr[8];
+        PPCCRRegister cr[8];
     };
 
     union

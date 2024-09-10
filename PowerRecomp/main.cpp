@@ -6,7 +6,7 @@
 #include <disasm.h>
 #include <filesystem>
 
-#define TEST_FILE "add.elf"
+#define TEST_FILE "cond.elf"
 
 int main()
 {
@@ -69,6 +69,10 @@ int main()
         ppc_insn insn;
         while (base < end)
         {
+            auto block = fn.SearchBlock(base);
+            if (block != -1 && (fn.base + fn.blocks[block].base) == base)
+                std::println(f, "loc_{:X}:", base);
+
             ppc::Disassemble(data, 4, base, insn);
 
             base += 4;
@@ -79,6 +83,8 @@ int main()
             }
             else
             {
+                // TODO: need to handle instructions that treat r0 as 0
+
                 std::println(f, "\t// {:x} {} {}", base - 4, insn.opcode->name, insn.op_str);
                 switch (insn.opcode->id)
                 {
@@ -88,17 +94,44 @@ int main()
                     break;
 
                 case PPC_INST_ADDI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 + {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
                     break;
 
                 case PPC_INST_ADDIC:
+                    break;
+
                 case PPC_INST_ADDIS:
+                    // TODO: validate the sign extend
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2] << 16));
+                    break;
+
                 case PPC_INST_ADDZE:
+                    break;
+
                 case PPC_INST_AND:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ANDC:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ANDI:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ANDIS:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
+                    break;
+
                 case PPC_INST_ATTN:
+                    // undefined instruction
+                    break;
+
                 case PPC_INST_B:
                 case PPC_INST_BCTR:
                 case PPC_INST_BCTRL:
@@ -159,8 +192,15 @@ int main()
                 case PPC_INST_CNTLZD:
                 case PPC_INST_CNTLZW:
                 case PPC_INST_DB16CYC:
+
                 case PPC_INST_DCBF:
+                    // no op
+                    break;
+
                 case PPC_INST_DCBT:
+                    // no op
+                    break;
+
                 case PPC_INST_DCBTST:
                 case PPC_INST_DCBZ:
                 case PPC_INST_DCBZL:
@@ -168,7 +208,12 @@ int main()
                 case PPC_INST_DIVDU:
                 case PPC_INST_DIVW:
                 case PPC_INST_DIVWU:
+                    break;
+
                 case PPC_INST_EIEIO:
+                    // no op
+                    break;
+
                 case PPC_INST_EXTSB:
                 case PPC_INST_EXTSH:
                 case PPC_INST_EXTSW:
@@ -201,10 +246,26 @@ int main()
                 case PPC_INST_FSQRTS:
                 case PPC_INST_FSUB:
                 case PPC_INST_FSUBS:
+                    break;
+
                 case PPC_INST_LBZ:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U8({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_LBZU:
+                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U8(ea);", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    break;
+
                 case PPC_INST_LBZX:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U8(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_LD:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_LDARX:
                 case PPC_INST_LDU:
                 case PPC_INST_LDX:
@@ -219,10 +280,15 @@ int main()
                     break;
 
                 case PPC_INST_LI:
-                    std::println(f, "\tctx.r{}.u64 = {};", insn.operands[0], insn.operands[1]);
+                    // TODO: validate the sign extend
+                    std::println(f, "\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LIS:
+                    // TODO: validate the sign extend
+                    std::println(f, "\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1] << 16));
+                    break;
+
                 case PPC_INST_LVEWX:
                 case PPC_INST_LVEWX128:
                 case PPC_INST_LVLX:
@@ -237,7 +303,10 @@ int main()
                 case PPC_INST_LWARX:
                 case PPC_INST_LWAX:
                 case PPC_INST_LWBRX:
+                    break;
+
                 case PPC_INST_LWSYNC:
+                    // no op
                     break;
 
                 case PPC_INST_LWZ:
@@ -280,17 +349,54 @@ int main()
                 case PPC_INST_MULHW:
                 case PPC_INST_MULHWU:
                 case PPC_INST_MULLD:
+                    break;
+
                 case PPC_INST_MULLI:
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 * {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
+                    break;
+
                 case PPC_INST_MULLW:
+                    break;
+
                 case PPC_INST_NAND:
+                    std::println(f, "\tctx.r{}.u64 = ~(ctx.r{}.u64 & ctx.r{}.u64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_NEG:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.s64 = -ctx.r{}.s64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_NOP:
+                    // no op
+                    break;
+
                 case PPC_INST_NOR:
+                    std::println(f, "\tctx.r{}.u64 = ~(ctx.r{}.u64 | ctx.r{}.u64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_NOT:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ~ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_OR:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ORC:
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ORI:
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | {}", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ORIS:
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | {}", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
+                    break;
+
                 case PPC_INST_RLDICL:
                 case PPC_INST_RLDICR:
                 case PPC_INST_RLDIMI:
@@ -457,9 +563,19 @@ int main()
                 case PPC_INST_VUPKLSH:
                 case PPC_INST_VXOR:
                 case PPC_INST_VXOR128:
+                    break;
+
                 case PPC_INST_XOR:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 ^ ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_XORI:
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_XORIS:
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
                     break;
                 }
             }
