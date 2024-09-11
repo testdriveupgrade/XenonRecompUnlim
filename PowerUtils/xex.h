@@ -90,12 +90,6 @@ typedef struct _XEX_HEADER
     be<uint32_t> NumberOfOptionalHeaders;
 } XEX_HEADER;
 
-typedef struct _X_RUNTIME_FUNCTION
-{
-    be<DWORD> BeginAddress;
-    be<DWORD> Flags; // honestly, no idea
-} X_RUNTIME_FUNCTION;
-
 template<typename T>
 inline static const T* Xex2FindOptionalHeader(const void* base, const XEX_OPTIONAL_HEADER* headers, size_t n, _XEX_OPTIONAL_HEADER_TYPES type)
 {

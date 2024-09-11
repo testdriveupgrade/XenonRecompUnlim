@@ -33,6 +33,12 @@ struct Image
     const void* Find(size_t address) const;
 
     /**
+     * \param name Name of section
+     * \return Section
+     */
+    const Section* Find(const std::string_view& name) const;
+
+    /**
      * \brief Parse given data to an image, reallocates with ownership
      * \param data Pointer to data
      * \param size Size of data

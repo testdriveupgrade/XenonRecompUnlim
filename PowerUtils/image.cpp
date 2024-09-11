@@ -20,6 +20,19 @@ const void* Image::Find(size_t address) const
     return section->data + (address - section->base);
 }
 
+const Section* Image::Find(const std::string_view& name) const
+{
+    for (const auto& section : sections)
+    {
+        if (section.name == name)
+        {
+            return &section;
+        }
+    }
+
+    return nullptr;
+}
+
 std::expected<Image, int> Image::ParseImage(const uint8_t* data, size_t size)
 {
     if (data[0] == ELFMAG0 && data[1] == ELFMAG1 && data[2] == ELFMAG2 && data[3] == ELFMAG3)

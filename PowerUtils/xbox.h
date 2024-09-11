@@ -162,6 +162,24 @@ struct _XLIST_ENTRY;
 typedef _XLIST_ENTRY XLIST_ENTRY;
 typedef xpointer<XLIST_ENTRY> PXLIST_ENTRY;
 
+typedef struct _X_RUNTIME_FUNCTION
+{
+    DWORD BeginAddress;
+
+    union 
+    {
+        DWORD Data;
+        struct
+        {
+            DWORD FunctionType : 2;
+            DWORD FunctionLength : 22;
+            DWORD PrologLength : 8;
+        };
+    };
+} X_RUNTIME_FUNCTION;
+
+static_assert(sizeof(X_RUNTIME_FUNCTION) == 8);
+
 typedef struct _XLIST_ENTRY
 {
     XDWORD Flink;
