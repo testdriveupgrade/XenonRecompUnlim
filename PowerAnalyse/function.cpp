@@ -165,7 +165,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
     for (const auto& block : blocks)
     {
         // pick the block furthest away
-        fn.size = std::max(size, block.base + block.size);
+        fn.size = std::max(fn.size, block.base + block.size);
     }
     return fn;
 }
