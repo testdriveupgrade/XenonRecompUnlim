@@ -7,6 +7,18 @@
 /* A macro to extract the extended opcode from an instruction.  */
 #define PPC_XOP(i) (((i) >> 1) & 0x3ff)
 
+/* A macro to extract the branch destination from a conditional instruction. */
+#define PPC_BD(i) ((signed int)((((i) & 0xFFFC) ^ 0x8000) - 0x8000))
+
+/* A macro to extract the branch destination from an immediate instruction. */
+#define PPC_BI(i) ((signed int)((((i) & 0x3FFFFFC) ^ 0x2000000) - 0x2000000))
+
+/* A macro to extract whether the branch is absolute. */
+#define PPC_BA(i) (!!((i) & 2))
+
+/* A macro to extract whether the branch is a link. */
+#define PPC_BL(i) (!!((i) & 1))
+
 #define PPC_OP_TDI 2
 #define PPC_OP_TWI 3
 #define PPC_OP_MULLI 7

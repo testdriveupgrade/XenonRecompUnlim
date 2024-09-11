@@ -2,6 +2,8 @@
 #include <disasm.h>
 #include <vector>
 #include <bit>
+#include <algorithm>
+#include <cassert>
 
 size_t Function::SearchBlock(size_t address) const
 {
@@ -39,7 +41,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
     blockStack.reserve(32);
     blockStack.emplace_back();
 
-    #define RESTORE_DATA() if (!blockStack.empty()) data = (dataStart + (blocks[blockStack.back()].base / sizeof(*data))) - 1; // continue adds one
+    #define RESTORE_DATA() if (!blockStack.empty()) data = (dataStart + ((blocks[blockStack.back()].base + blocks[blockStack.back()].size) / sizeof(*data))) - 1; // continue adds one
 
     // TODO: Branch fallthrough
     for (; data <= dataEnd ; ++data)
@@ -55,16 +57,13 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
         const auto op = PPC_OP(instruction);
         const auto xop = PPC_XOP(instruction);
-        const auto isLink = instruction & 1; // call
+        const auto isLink = PPC_BL(instruction); // call
 
         ppc_insn insn;
         ppc::Disassemble(data, addr, insn);
 
-        if (curBlock.base == 0x28)
-        {
-            printf("");
-        }
-
+        // Sanity check
+        assert(addr == base + curBlock.base  + curBlock.size);
         if (curBlock.projectedSize != -1 && curBlock.size >= curBlock.projectedSize) // fallthrough
         {
             blockStack.pop_back();
@@ -80,43 +79,46 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                 continue;
             }
 
+            // TODO: carry projections over to false
             curBlock.projectedSize = -1;
             blockStack.pop_back();
+
+            // TODO: Handle absolute branches?
+            assert(!PPC_BA(instruction));
+            const auto branchDest = addr + PPC_BD(instruction);
+
             // true/false paths
             // left block: false case
             // right block: true case
-
             const auto lBase = (addr - base) + 4;
-            const auto rBase = insn.operands[1] - base;
+            const auto rBase = (addr + PPC_BD(instruction)) - base;
 
             // these will be -1 if it's our first time seeing these blocks
             auto lBlock = fn.SearchBlock(base + lBase);
 
             if (lBlock == -1)
             {
+                DEBUG(const auto blockBase = curBlock.base);
                 blocks.emplace_back(lBase, 0).projectedSize = rBase - lBase;
                 lBlock = blocks.size() - 1;
-            }
 
-            // push this first, this gets overriden by the true case as it'd be further away
-            if (lBlock != -1)
-            {
+                // push this first, this gets overriden by the true case as it'd be further away
+                DEBUG(blocks[lBlock].parent = blockBase);
                 blockStack.emplace_back(lBlock);
             }
 
             auto rBlock = fn.SearchBlock(base + rBase);
             if (rBlock == -1)
             {
-                blocks.emplace_back(insn.operands[1] - base, 0);
+                DEBUG(const auto blockBase = curBlock.base);
+                blocks.emplace_back(branchDest - base, 0);
                 rBlock = blocks.size() - 1;
 
+                DEBUG(blocks[rBlock].parent = blockBase);
                 blockStack.emplace_back(rBlock);
             }
 
-            if (!blockStack.empty())
-            {
-                RESTORE_DATA();
-            }
+            RESTORE_DATA();
         }
         else if (op == PPC_OP_B || (op == PPC_OP_CTR && xop == 16) || instruction == 0) // b, blr, end padding
         {
@@ -127,8 +129,11 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                 // Keep analyzing if we have continuity
                 if (op == PPC_OP_B)
                 {
-                    const auto branchBase = insn.operands[0] - base;
-                    const auto branchBlock = fn.SearchBlock(insn.operands[0]);
+                    assert(!PPC_BA(instruction));
+                    const auto branchDest = addr + PPC_BI(instruction);
+
+                    const auto branchBase = branchDest - base;
+                    const auto branchBlock = fn.SearchBlock(branchDest);
 
                     // carry over our projection if blocks are next to each other
                     const auto isContinious = branchBase == curBlock.base + curBlock.size;
@@ -140,25 +145,27 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
                         if (branchBlock == -1)
                         {
+                            DEBUG(const auto blockBase = curBlock.base);
                             blocks.emplace_back(branchBase, 0, sizeProjection);
+
                             blockStack.emplace_back(blocks.size() - 1);
+                            DEBUG(blocks.back().parent = blockBase);
+                            RESTORE_DATA();
+                            continue;
                         }
                     }
                 }
 
-                if (!blockStack.empty())
-                {
-                    RESTORE_DATA();
-                }
+                RESTORE_DATA();
             }
         }
     }
-    
+
+    fn.size = 0;
     for (const auto& block : blocks)
     {
         // pick the block furthest away
-        fn.size = std::max(fn.size, block.base + block.size);
+        fn.size = std::max(size, block.base + block.size);
     }
-    
     return fn;
 }
