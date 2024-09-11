@@ -320,7 +320,7 @@ int main()
                     break;
 
                 case PPC_INST_MFLR:
-                    std::println(f, "\tctx.lr = ctx.r{}.u64;", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u64 = ctx.lr;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MFMSR:
@@ -339,7 +339,7 @@ int main()
                     break;
 
                 case PPC_INST_MTLR:
-                    std::println(f, "\tctx.r{}.u64 = ctx.lr;", insn.operands[0]);
+                    std::println(f, "\tctx.lr = ctx.r{}.u64;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MTMSRD:
@@ -390,7 +390,7 @@ int main()
                     break;
 
                 case PPC_INST_ORI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | {}", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | {};", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_ORIS:
