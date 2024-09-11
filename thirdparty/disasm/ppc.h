@@ -19,6 +19,9 @@
 /* A macro to extract whether the branch is a link. */
 #define PPC_BL(i) (!!((i) & 1))
 
+/* A macro to extract the branch operation of an instruction. */
+#define PPC_BO(i) (((i) >> 21) & 0x1F)
+
 #define PPC_OP_TDI 2
 #define PPC_OP_TWI 3
 #define PPC_OP_MULLI 7

@@ -162,7 +162,7 @@ struct _XLIST_ENTRY;
 typedef _XLIST_ENTRY XLIST_ENTRY;
 typedef xpointer<XLIST_ENTRY> PXLIST_ENTRY;
 
-typedef struct _X_RUNTIME_FUNCTION
+typedef struct _IMAGE_CE_RUNTIME_FUNCTION
 {
     DWORD BeginAddress;
 
@@ -171,14 +171,15 @@ typedef struct _X_RUNTIME_FUNCTION
         DWORD Data;
         struct
         {
-            DWORD FunctionType : 2;
-            DWORD FunctionLength : 22;
             DWORD PrologLength : 8;
+            DWORD FunctionLength : 22;
+            DWORD ThirtyTwoBit : 1;
+            DWORD ExceptionFlag : 1;
         };
     };
-} X_RUNTIME_FUNCTION;
+} IMAGE_CE_RUNTIME_FUNCTION;
 
-static_assert(sizeof(X_RUNTIME_FUNCTION) == 8);
+static_assert(sizeof(IMAGE_CE_RUNTIME_FUNCTION) == 8);
 
 typedef struct _XLIST_ENTRY
 {
