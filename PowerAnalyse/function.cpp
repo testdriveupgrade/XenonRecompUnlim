@@ -120,44 +120,84 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
             RESTORE_DATA();
         }
-        else if (op == PPC_OP_B || (op == PPC_OP_CTR && xop == 16) || instruction == 0) // b, blr, end padding
+        else if (op == PPC_OP_B || instruction == 0 || insn.opcode->id == PPC_INST_BLR) // b, blr, end padding
         {
             if (!isLink)
             {
                 blockStack.pop_back();
 
-                // Keep analyzing if we have continuity
                 if (op == PPC_OP_B)
                 {
+                    // Tail call, no need to chase
+                    if (blocks.size() == 1)
+                    {
+                        RESTORE_DATA();
+                        continue;
+                    }
+
+                    // Keep analyzing if we have continuity
                     assert(!PPC_BA(instruction));
                     const auto branchDest = addr + PPC_BI(instruction);
 
                     const auto branchBase = branchDest - base;
                     const auto branchBlock = fn.SearchBlock(branchDest);
 
+                    if (branchDest < base)
+                    {
+                        // Branches before base are just tail calls, no need to chase after those
+                        RESTORE_DATA();
+                        continue;
+                    }
+
                     // carry over our projection if blocks are next to each other
-                    const auto isContinious = branchBase == curBlock.base + curBlock.size;
+                    const auto isContinuous = branchBase == curBlock.base + curBlock.size;
                     auto sizeProjection = (size_t)-1;
 
-                    if (isContinious && curBlock.projectedSize != -1)
+                    if (curBlock.projectedSize != -1 && isContinuous)
                     {
                         sizeProjection = curBlock.projectedSize - curBlock.size;
+                    }
 
-                        if (branchBlock == -1)
-                        {
-                            DEBUG(const auto blockBase = curBlock.base);
-                            blocks.emplace_back(branchBase, 0, sizeProjection);
+                    if (branchBlock == -1)
+                    {
+                        DEBUG(const auto blockBase = curBlock.base);
+                        blocks.emplace_back(branchBase, 0, sizeProjection);
 
-                            blockStack.emplace_back(blocks.size() - 1);
-                            DEBUG(blocks.back().parent = blockBase);
-                            RESTORE_DATA();
-                            continue;
-                        }
+                        blockStack.emplace_back(blocks.size() - 1);
+                        DEBUG(blocks.back().parent = blockBase);
+                        RESTORE_DATA();
+                        continue;
                     }
                 }
 
                 RESTORE_DATA();
             }
+        }
+    }
+
+    // Sort and invalidate discontinuous blocks
+    if (blocks.size() > 1)
+    {
+        std::ranges::sort(blocks, [](const Block& a, const Block& b)
+        {
+            return a.base < b.base;
+        });
+
+        size_t discontinuity = -1;
+        for (size_t i = 0; i < blocks.size() - 1; i++)
+        {
+            if (blocks[i].base + blocks[i].size >= blocks[i + 1].base)
+            {
+                continue;
+            }
+
+            discontinuity = i + 1;
+            break;
+        }
+
+        if (discontinuity != -1)
+        {
+            blocks.erase(blocks.begin() + discontinuity, blocks.end());
         }
     }
 
