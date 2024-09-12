@@ -144,7 +144,10 @@ int main()
                     break;
 
                 case PPC_INST_BDNZF:
+                    break;
+
                 case PPC_INST_BEQ:
+                    std::println(f, "\tif (ctx.cr{}.eq) goto loc_{:X};", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_BEQLR:
@@ -152,6 +155,7 @@ int main()
                     break;
 
                 case PPC_INST_BGE:
+                    std::println(f, "\tif (!ctx.cr{}.lt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_BGELR:
@@ -159,6 +163,7 @@ int main()
                     break;
 
                 case PPC_INST_BGT:
+                    std::println(f, "\tif (ctx.cr{}.gt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_BGTLR:
@@ -187,6 +192,7 @@ int main()
                     break;
 
                 case PPC_INST_BLELR:
+                    std::println(f, "\tif (!ctx.cr{}.gt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BLR:
@@ -194,8 +200,14 @@ int main()
                     break;
 
                 case PPC_INST_BLRL:
+                    break;
+
                 case PPC_INST_BLT:
+                    std::println(f, "\tif (ctx.cr{}.lt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_BLTLR:
+                    std::println(f, "\tif (ctx.cr{}.lt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BNE:
@@ -203,7 +215,11 @@ int main()
                     break;
 
                 case PPC_INST_BNECTR:
+                    break;
+
                 case PPC_INST_BNELR:
+                    std::println(f, "\tif (!ctx.cr{}.eq) return;", insn.operands[0]);
+                    break;
 
                 case PPC_INST_CCTPL:
                 case PPC_INST_CCTPM:
