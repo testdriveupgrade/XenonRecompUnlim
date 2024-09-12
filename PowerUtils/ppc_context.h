@@ -3,12 +3,14 @@
 #include <cstdlib>
 
 #ifdef __clang__
+#include <x86intrin.h>
 #define __restrict __restrict__
 #define _byteswap_ushort __builtin_bswap16
 #define _byteswap_ulong __builtin_bswap32
 #define _byteswap_uint64 __builtin_bswap64
 #define PPC_FUNC __attribute__((weak,noinline))
 #else
+#include <intrin.h>
 #define PPC_FUNC __declspec(noinline)
 #endif
 

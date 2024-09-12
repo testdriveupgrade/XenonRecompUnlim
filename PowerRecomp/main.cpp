@@ -274,7 +274,11 @@ int main()
                     break;
 
                 case PPC_INST_CNTLZD:
+                    std::println(f, "\tctx.r{}.u64 = __lzcnt64(ctx.r{}.u64);", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_CNTLZW:
+                    std::println(f, "\tctx.r{}.u64 = __lzcnt32(ctx.r{}.u32);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_DB16CYC:
@@ -303,8 +307,21 @@ int main()
                     break;
 
                 case PPC_INST_EXTSB:
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s8;", insn.operands[0], insn.operands[1]);
+                    if (insn.opcode->opcode & 0x1)
+                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_EXTSH:
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s16;", insn.operands[0], insn.operands[1]);
+                    if (insn.opcode->opcode & 0x1)
+                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_EXTSW:
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FABS:
                 case PPC_INST_FADD:
                 case PPC_INST_FADDS:
@@ -440,9 +457,18 @@ int main()
                 case PPC_INST_MTXER:
                 case PPC_INST_MULCHWU:
                 case PPC_INST_MULHHW:
+                    break;
+
                 case PPC_INST_MULHW:
+                    std::println(f, "\tctx.r{}.s64 = (ctx.r{}.s32 * ctx.r{}.s32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_MULHWU:
+                    std::println(f, "\tctx.r{}.u64 = (ctx.r{}.u32 * ctx.r{}.u32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_MULLD:
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 * ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULLI:
@@ -544,6 +570,9 @@ int main()
                     break;
 
                 case PPC_INST_STWBRX:
+                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ulong(ctx.r{}.u32));", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STWCX:
                     break;
 
@@ -554,7 +583,13 @@ int main()
                     break;
 
                 case PPC_INST_STWUX:
+                    std::println(f, "\tea = ctx.r{}.u32 + ctx.r{}.u32;", insn.operands[1], insn.operands[2]);
+                    std::println(f, "\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u32 = ea;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_STWX:
+                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBF:
