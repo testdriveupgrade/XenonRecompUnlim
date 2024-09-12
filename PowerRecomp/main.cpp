@@ -178,7 +178,7 @@ int main()
                     std::println(f, "\tctx.lr = 0x{:X};", base);
                     std::println(f, "\tcallerCtx = ctx;");
                     std::println(f, "\t{}(callerCtx, base);", targetName);
-                    std::println(f, "\ctx = callerCtx;");
+                    std::println(f, "\tctx = callerCtx;");
                     break;
                 }
 
