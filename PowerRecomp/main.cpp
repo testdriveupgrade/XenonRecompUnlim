@@ -460,10 +460,12 @@ int main()
                     break;
 
                 case PPC_INST_MULHW:
+                    // TODO: might be having 32 bit truncation here
                     std::println(f, "\tctx.r{}.s64 = (ctx.r{}.s32 * ctx.r{}.s32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULHWU:
+                    // TODO: might be having 32 bit truncation here
                     std::println(f, "\tctx.r{}.u64 = (ctx.r{}.u32 * ctx.r{}.u32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
