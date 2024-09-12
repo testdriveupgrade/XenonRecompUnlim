@@ -541,21 +541,58 @@ int main()
                 case PPC_INST_SRAWI:
                 case PPC_INST_SRD:
                 case PPC_INST_SRW:
+                    break;
+
                 case PPC_INST_STB:
+                    std::println(f, "\tPPC_STORE_U8({} + ctx.r{}.u32, ctx.r{}.u8);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STBU:
+                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    std::println(f, "\tPPC_STORE_U8(ea, ctx.r{}.u8);", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_STBX:
+                    std::println(f, "\tPPC_STORE_U8(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u8);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STD:
+                    std::println(f, "\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.r{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STDCX:
+                    break;
+
                 case PPC_INST_STDU:
+                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    std::println(f, "\tPPC_STORE_U64(ea, ctx.r{}.u64);", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_STDX:
+                    std::println(f, "\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STFD:
                 case PPC_INST_STFDX:
                 case PPC_INST_STFIWX:
                 case PPC_INST_STFS:
                 case PPC_INST_STFSX:
+                    break;
+
                 case PPC_INST_STH:
+                    std::println(f, "\tPPC_STORE_U16({} + ctx.r{}.u32, ctx.r{}.u16);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STHBRX:
+                    std::println(f, "\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ushort(ctx.r{}.u16));", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STHX:
+                    std::println(f, "\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u16);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STVEHX:
                 case PPC_INST_STVEWX:
                 case PPC_INST_STVEWX128:
