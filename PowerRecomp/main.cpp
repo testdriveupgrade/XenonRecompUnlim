@@ -63,7 +63,7 @@ int main()
             name = std::format("sub_{:X}", base);
         }
 
-        std::println(f, "void {}(PPCContext& __restrict callerCtx, uint8_t* base) {{", name);
+        std::println(f, "PPC_FUNC void {}(PPCContext& __restrict callerCtx, uint8_t* base) {{", name);
         std::println(f, "\tPPCContext ctx = callerCtx;");
         std::println(f, "\tuint32_t ea;\n");
 
@@ -176,7 +176,9 @@ int main()
                         targetName = std::format("sub_{:X}", insn.operands[0]);
                     }
                     std::println(f, "\tctx.lr = 0x{:X};", base);
-                    std::println(f, "\t{}(ctx, base);", targetName);
+                    std::println(f, "\tcallerCtx = ctx;");
+                    std::println(f, "\t{}(callerCtx, base);", targetName);
+                    std::println(f, "\ctx = callerCtx;");
                     break;
                 }
 
