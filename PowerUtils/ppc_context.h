@@ -42,6 +42,14 @@ struct PPCCRRegister
     uint8_t gt;
     uint8_t eq;
     uint8_t so;
+
+    template<typename T>
+    void compare(T left, T right)
+    {
+        lt = left < right;
+        gt = left > right;
+        eq = left == right;
+    }
 };
 
 typedef float float128[4];

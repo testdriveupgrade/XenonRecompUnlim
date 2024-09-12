@@ -63,7 +63,8 @@ int main()
             name = std::format("sub_{:X}", base);
         }
 
-        std::println(f, "void {}(PPCContext& __restrict ctx, uint8_t* __restrict base) {{", name);
+        std::println(f, "void {}(PPCContext& __restrict callerCtx, uint8_t* base) {{", name);
+        std::println(f, "\tPPCContext ctx = callerCtx;");
         std::println(f, "\tuint32_t ea;\n");
 
         ppc_insn insn;
@@ -133,16 +134,33 @@ int main()
                     break;
 
                 case PPC_INST_B:
+                    // TODO: tail calls
+                    std::println(f, "\tgoto loc_{:X};", insn.operands[0]);
+                    break;
+
                 case PPC_INST_BCTR:
                 case PPC_INST_BCTRL:
                 case PPC_INST_BDNZ:
                 case PPC_INST_BDNZF:
                 case PPC_INST_BEQ:
+                    break;
+
                 case PPC_INST_BEQLR:
+                    std::println(f, "\tif (ctx.cr{}.eq) goto end;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_BGE:
+                    break;
+
                 case PPC_INST_BGELR:
+                    std::println(f, "\tif (!ctx.cr{}.lt) goto end;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_BGT:
+                    break;
+
                 case PPC_INST_BGTLR:
+                    std::println(f, "\tif (ctx.cr{}.gt) goto end;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BL:
@@ -167,16 +185,21 @@ int main()
                     break;
 
                 case PPC_INST_BLR:
-                    // TODO: do they use this for anything other than a return?
-                    std::println(f, "\treturn;");
+                    std::println(f, "\tgoto end;");
                     break;
 
                 case PPC_INST_BLRL:
                 case PPC_INST_BLT:
                 case PPC_INST_BLTLR:
+                    break;
+
                 case PPC_INST_BNE:
+                    std::println(f, "\tif (!ctx.cr{}.eq) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_BNECTR:
                 case PPC_INST_BNELR:
+
                 case PPC_INST_CCTPL:
                 case PPC_INST_CCTPM:
                 case PPC_INST_CLRLDI:
@@ -186,7 +209,12 @@ int main()
                 case PPC_INST_CMPLD:
                 case PPC_INST_CMPLDI:
                 case PPC_INST_CMPLW:
+                    break;
+
                 case PPC_INST_CMPLWI:
+                    std::println(f, "\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, {});", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_CMPW:
                 case PPC_INST_CMPWI:
                 case PPC_INST_CNTLZD:
@@ -455,7 +483,13 @@ int main()
 
                 case PPC_INST_STWUX:
                 case PPC_INST_STWX:
+                    break;
+
                 case PPC_INST_SUBF:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 - ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_SUBFC:
                 case PPC_INST_SUBFE:
                 case PPC_INST_SUBFIC:
@@ -580,6 +614,9 @@ int main()
                 }
             }
         }
+
+        std::println(f, "end:");
+        std::println(f, "\tcallerCtx = ctx;");
 
         std::println(f, "}}\n");
     }
