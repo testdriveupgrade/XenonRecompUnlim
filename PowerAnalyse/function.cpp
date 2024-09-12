@@ -16,9 +16,9 @@ size_t Function::SearchBlock(size_t address) const
     {
         const auto& block = blocks[i];
         const auto begin = base + block.base;
-        const auto end = begin + size;
+        const auto end = begin + block.size;
 
-        if (address >= begin && address <= end)
+        if (address >= begin && address < end)
         {
             return i;
         }
