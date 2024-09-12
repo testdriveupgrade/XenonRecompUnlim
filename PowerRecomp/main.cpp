@@ -233,14 +233,14 @@ int main()
                     break;
 
                 case PPC_INST_CMPLWI:
-                    std::println(f, "\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, {});", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    std::println(f, "\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, {}, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPW:
                     break;
 
                 case PPC_INST_CMPWI:
-                    std::println(f, "\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, {});", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
+                    std::println(f, "\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, {}, ctx.xer);", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
                     break;
 
                 case PPC_INST_CNTLZD:

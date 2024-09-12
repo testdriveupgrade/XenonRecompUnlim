@@ -39,6 +39,13 @@ struct PPCRegister
     };
 };
 
+struct PPCXERRegister
+{
+    uint8_t so;
+    uint8_t ov;
+    uint8_t ca;
+};
+
 struct PPCCRRegister
 {
     uint8_t lt;
@@ -47,11 +54,12 @@ struct PPCCRRegister
     uint8_t so;
 
     template<typename T>
-    void compare(T left, T right)
+    void compare(T left, T right, const PPCXERRegister& xer)
     {
         lt = left < right;
         gt = left > right;
         eq = left == right;
+        so = xer.so;
     }
 };
 
@@ -61,6 +69,7 @@ struct PPCContext
 {
     uint64_t lr;
     uint64_t ctr;
+    PPCXERRegister xer;
 
     union
     {
