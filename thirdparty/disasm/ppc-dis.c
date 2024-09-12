@@ -5663,6 +5663,8 @@ static int decode_insn_powerpc(bfd_vma memaddr, disassemble_info* info, int bige
         insn = bfd_getl32(buffer);
 
     oinsn->instruction = insn;
+    memset(oinsn->operands, 0, sizeof(oinsn->operands));
+
     /* Get the major opcode of the instruction.  */
     op = PPC_OP(insn);
 

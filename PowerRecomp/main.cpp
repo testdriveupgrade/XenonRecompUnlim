@@ -63,16 +63,13 @@ int main()
             name = std::format("sub_{:X}", base);
         }
 
-        std::println(f, "PPC_FUNC void {}(PPCContext& __restrict callerCtx, uint8_t* base) {{", name);
-        std::println(f, "\tPPCContext ctx = callerCtx;");
+        std::println(f, "PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base) {{", name);
         std::println(f, "\tuint32_t ea;\n");
 
         ppc_insn insn;
         while (base < end)
         {
-            auto block = fn.SearchBlock(base);
-            if (block != -1 && (fn.base + fn.blocks[block].base) == base)
-                std::println(f, "loc_{:X}:", base);
+            std::println(f, "loc_{:X}:", base);
 
             ppc::Disassemble(data, 4, base, insn);
 
@@ -140,27 +137,32 @@ int main()
 
                 case PPC_INST_BCTR:
                 case PPC_INST_BCTRL:
+                    break;
+
                 case PPC_INST_BDNZ:
+                    std::println(f, "\tif (--ctx.ctr != 0) goto loc_{:X};", insn.operands[0]);
+                    break;
+
                 case PPC_INST_BDNZF:
                 case PPC_INST_BEQ:
                     break;
 
                 case PPC_INST_BEQLR:
-                    std::println(f, "\tif (ctx.cr{}.eq) goto end;", insn.operands[0]);
+                    std::println(f, "\tif (ctx.cr{}.eq) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BGE:
                     break;
 
                 case PPC_INST_BGELR:
-                    std::println(f, "\tif (!ctx.cr{}.lt) goto end;", insn.operands[0]);
+                    std::println(f, "\tif (!ctx.cr{}.lt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BGT:
                     break;
 
                 case PPC_INST_BGTLR:
-                    std::println(f, "\tif (ctx.cr{}.gt) goto end;", insn.operands[0]);
+                    std::println(f, "\tif (ctx.cr{}.gt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BL:
@@ -176,18 +178,19 @@ int main()
                         targetName = std::format("sub_{:X}", insn.operands[0]);
                     }
                     std::println(f, "\tctx.lr = 0x{:X};", base);
-                    std::println(f, "\tcallerCtx = ctx;");
-                    std::println(f, "\t{}(callerCtx, base);", targetName);
-                    std::println(f, "\tctx = callerCtx;");
+                    std::println(f, "\t{}(ctx, base);", targetName);
                     break;
                 }
 
                 case PPC_INST_BLE:
+                    std::println(f, "\tif (!ctx.cr{}.gt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_BLELR:
                     break;
 
                 case PPC_INST_BLR:
-                    std::println(f, "\tgoto end;");
+                    std::println(f, "\treturn;");
                     break;
 
                 case PPC_INST_BLRL:
@@ -218,7 +221,12 @@ int main()
                     break;
 
                 case PPC_INST_CMPW:
+                    break;
+
                 case PPC_INST_CMPWI:
+                    std::println(f, "\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, {});", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
+                    break;
+
                 case PPC_INST_CNTLZD:
                 case PPC_INST_CNTLZW:
                 case PPC_INST_DB16CYC:
@@ -364,7 +372,12 @@ int main()
                     break;
 
                 case PPC_INST_MTCR:
+                    break;
+
                 case PPC_INST_MTCTR:
+                    std::println(f, "\tctx.ctr = ctx.r{}.u64;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_MTFSF:
                     break;
 
@@ -386,6 +399,8 @@ int main()
                     break;
 
                 case PPC_INST_MULLW:
+                    // TODO: . variant
+                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s32 * ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_NAND:
@@ -616,9 +631,6 @@ int main()
                 }
             }
         }
-
-        std::println(f, "end:");
-        std::println(f, "\tcallerCtx = ctx;");
 
         std::println(f, "}}\n");
     }
