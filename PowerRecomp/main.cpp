@@ -64,6 +64,7 @@ int main()
         }
 
         std::println(f, "PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base) {{", name);
+        std::println(f, "\tPPCRegister temp;\n");
         std::println(f, "\tuint32_t ea;\n");
 
         ppc_insn insn;
@@ -460,16 +461,50 @@ int main()
                     break;
 
                 case PPC_INST_LDARX:
+                    break;
+
                 case PPC_INST_LDU:
+                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U64(ea);", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    break;
+
                 case PPC_INST_LDX:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_LFD:
+                    std::println(f, "\tctx.f{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_LFDX:
+                    std::println(f, "\tctx.f{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_LFS:
+                    std::println(f, "\ttemp.u32 = PPC_LOAD_U32({} + ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2]);
+                    std::println(f, "\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_LFSX:
+                    std::println(f, "\ttemp.u32 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[1], insn.operands[2]);
+                    std::println(f, "\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_LHA:
+                    std::println(f, "\tctx.r{}.s64 = int16_t(PPC_LOAD_U16({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_LHAX:
+                    std::println(f, "\tctx.r{}.s64 = int16_t(PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_LHZ:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U16({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_LHZX:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LI:
@@ -492,10 +527,21 @@ int main()
                 case PPC_INST_LVSR:
                 case PPC_INST_LVX:
                 case PPC_INST_LVX128:
+                    break;
+
                 case PPC_INST_LWA:
+                    std::println(f, "\tctx.r{}.s64 = int32_t(PPC_LOAD_U32({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_LWARX:
+                    break;
+
                 case PPC_INST_LWAX:
+                    std::println(f, "\tctx.r{}.s64 = int32_t(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_LWBRX:
+                    std::println(f, "\tctx.r{}.u64 = _byteswap_ulong(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LWSYNC:
@@ -507,7 +553,15 @@ int main()
                     break;
 
                 case PPC_INST_LWZU:
+                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U32(ea);", insn.operands[0]);
+                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    break;
+
                 case PPC_INST_LWZX:
+                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_MFCR:
                 case PPC_INST_MFFS:
                     break;
@@ -663,10 +717,25 @@ int main()
                     break;
 
                 case PPC_INST_STFD:
+                    std::println(f, "\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.f{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STFDX:
+                    std::println(f, "\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STFIWX:
+                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_STFS:
+                    std::println(f, "\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
+                    std::println(f, "\tPPC_STORE_U32({} + ctx.r{}.u32, temp.u32);", int32_t(insn.operands[1]), insn.operands[2]);
+                    break;
+
                 case PPC_INST_STFSX:
+                    std::println(f, "\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
+                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, temp.u32);", insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_STH:
