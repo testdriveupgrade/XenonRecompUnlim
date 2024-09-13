@@ -83,6 +83,22 @@ int main()
             else
             {
                 std::println(f, "\t// {:x} {} {}", base - 4, insn.opcode->name, insn.op_str);
+
+                auto printConditionalBranch = [&](bool not_, const std::string_view& cond)
+                {
+                    if (insn.operands[1] < fn.base || insn.operands[1] >= fn.base + fn.size)
+                    {
+                        std::println(f, "\tif ({}ctx.cr{}.{}) {{", not_ ? "!" : "", insn.operands[0], cond);
+                        std::println(f, "\t\tctx.fn[0x{:X}](ctx, base);", insn.operands[1] / 4);
+                        std::println(f, "\t\treturn;");
+                        std::println(f, "\t}}");
+                    }
+                    else
+                    {
+                        std::println(f, "\tif ({}ctx.cr{}.{}) goto loc_{:X};", not_ ? "!" : "", insn.operands[0], cond, insn.operands[1]);
+                    }
+                };
+
                 switch (insn.opcode->id)
                 {
                 case PPC_INST_ADD:
@@ -140,8 +156,15 @@ int main()
                     break;
 
                 case PPC_INST_B:
-                    // TODO: tail calls
-                    std::println(f, "\tgoto loc_{:X};", insn.operands[0]);
+                    if (insn.operands[0] < fn.base || insn.operands[0] >= fn.base + fn.size)
+                    {
+                        std::println(f, "\tctx.fn[0x{:X}](ctx, base);", insn.operands[0] / 4);
+                        std::println(f, "\treturn;");
+                    }
+                    else
+                    {
+                        std::println(f, "\tgoto loc_{:X};", insn.operands[0]);
+                    }
                     break;
 
                 case PPC_INST_BCTR:
@@ -156,7 +179,7 @@ int main()
                     break;
 
                 case PPC_INST_BEQ:
-                    std::println(f, "\tif (ctx.cr{}.eq) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    printConditionalBranch(false, "eq");
                     break;
 
                 case PPC_INST_BEQLR:
@@ -164,7 +187,7 @@ int main()
                     break;
 
                 case PPC_INST_BGE:
-                    std::println(f, "\tif (!ctx.cr{}.lt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    printConditionalBranch(true, "lt");
                     break;
 
                 case PPC_INST_BGELR:
@@ -172,7 +195,7 @@ int main()
                     break;
 
                 case PPC_INST_BGT:
-                    std::println(f, "\tif (ctx.cr{}.gt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    printConditionalBranch(false, "gt");
                     break;
 
                 case PPC_INST_BGTLR:
@@ -185,7 +208,7 @@ int main()
                     break;
 
                 case PPC_INST_BLE:
-                    std::println(f, "\tif (!ctx.cr{}.gt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    printConditionalBranch(true, "gt");
                     break;
 
                 case PPC_INST_BLELR:
@@ -200,7 +223,7 @@ int main()
                     break;
 
                 case PPC_INST_BLT:
-                    std::println(f, "\tif (ctx.cr{}.lt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    printConditionalBranch(false, "lt");
                     break;
 
                 case PPC_INST_BLTLR:
@@ -208,7 +231,7 @@ int main()
                     break;
 
                 case PPC_INST_BNE:
-                    std::println(f, "\tif (!ctx.cr{}.eq) goto loc_{:X};", insn.operands[0], insn.operands[1]);
+                    printConditionalBranch(true, "eq");
                     break;
 
                 case PPC_INST_BNECTR:
