@@ -174,21 +174,9 @@ int main()
                     break;
 
                 case PPC_INST_BL:
-                {
-                    std::string targetName = "";
-                    auto targetSymbol = image.symbols.find(insn.operands[0]);
-                    if (targetSymbol != image.symbols.end() && targetSymbol->type == Symbol_Function)
-                    {
-                        targetName = targetSymbol->name;
-                    }
-                    else
-                    {
-                        targetName = std::format("sub_{:X}", insn.operands[0]);
-                    }
                     std::println(f, "\tctx.lr = 0x{:X};", base);
-                    std::println(f, "\t{}(ctx, base);", targetName);
+                    std::println(f, "\tctx.fn[0x{:X}](ctx, base);", base / 4);
                     break;
-                }
 
                 case PPC_INST_BLE:
                     std::println(f, "\tif (!ctx.cr{}.gt) goto loc_{:X};", insn.operands[0], insn.operands[1]);
@@ -279,7 +267,7 @@ int main()
                     break;
 
                 case PPC_INST_CNTLZW:
-                    std::println(f, "\tctx.r{}.u64 = __lzcnt32(ctx.r{}.u32);", insn.operands[0], insn.operands[1]);
+                    std::println(f, "\tctx.r{}.u64 = __lzcnt(ctx.r{}.u32);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_DB16CYC:
