@@ -341,6 +341,7 @@ int main()
                     break;
 
                 case PPC_INST_FCMPU:
+                    std::println(f, "\tctx.cr{}.compare(ctx.f{}.f64, ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FCTID:

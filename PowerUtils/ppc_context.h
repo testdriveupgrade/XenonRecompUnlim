@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstdlib>
+#include <cmath>
 
 #ifdef __clang__
 #include <x86intrin.h>
@@ -53,7 +54,11 @@ struct PPCCRRegister
     uint8_t lt;
     uint8_t gt;
     uint8_t eq;
-    uint8_t so;
+    union
+    {
+        uint8_t so;
+        uint8_t un;
+    };
 
     template<typename T>
     void compare(T left, T right, const PPCXERRegister& xer)
@@ -62,6 +67,14 @@ struct PPCCRRegister
         gt = left > right;
         eq = left == right;
         so = xer.so;
+    }
+
+    void compare(double left, double right)
+    {
+        lt = left < right;
+        gt = left > right;
+        eq = left == right;
+        un = isnan(left) || isnan(right);
     }
 };
 
