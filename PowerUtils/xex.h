@@ -7,6 +7,12 @@
 
 #define XEX_ENCRYPTION_NONE 0
 
+enum _XEX_THUNK_TYPES
+{
+    XEX_THUNK_VARIABLE = 0,
+    XEX_THUNK_FUNCTION = 1,
+};
+
 enum _XEX_OPTIONAL_HEADER_TYPES
 {
     XEX_HEADER_RESOURCE_INFO = 0x000002FF,
@@ -54,10 +60,51 @@ typedef struct _XEX_BASIC_FILE_COMPRESSION_INFO
     be<uint32_t> SizeOfPadding;
 } XEX_BASIC_FILE_COMPRESSION_INFO;
 
+typedef struct _XEX_THUNK_DATA {
+    union
+    {
+        struct
+        {
+            WORD Ordinal : 16;
+            WORD Hint : 8;
+            WORD Type : 8;
+        } OriginalData;
+
+        XDWORD Ordinal;
+        XDWORD Function;
+        XDWORD AddressOfData;
+
+        // For easier swapping
+        DWORD Data;
+    };
+} XEX_THUNK_DATA;
+
+typedef struct _XEX_IMPORT_HEADER {
+    XDWORD SizeOfHeader;
+    XDWORD SizeOfStringTable;
+    XDWORD NumImports;
+} XEX_IMPORT_HEADER;
+
+typedef struct _XEX_IMPORT_LIBRARY {
+    XDWORD Size;
+    char NextImportDigest[0x14];
+    XDWORD ID;
+    XDWORD Version;
+    XDWORD MinVersion;
+    XWORD Name;
+    XWORD NumberOfImports;
+} XEX_IMPORT_LIBRARY;
+
+static_assert(sizeof(XEX_IMPORT_LIBRARY) == 0x28);
+
+typedef struct _XEX_IMPORT_DESCRIPTOR {
+    XDWORD FirstThunk; // VA XEX_THUNK_DATA
+} XEX_IMPORT_DESCRIPTOR;
+
 typedef struct _XEX_OPTIONAL_HEADER
 {
-    be<uint32_t> Type;
-    be<uint32_t> Address;
+    XDWORD Type;
+    XDWORD Address;
 } XEX_OPTIONAL_HEADER;
 
 typedef struct _XEX2_SECURITY_INFO

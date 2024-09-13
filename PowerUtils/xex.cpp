@@ -1,6 +1,7 @@
 #include "xex.h"
 #include "image.h"
 #include <cassert>
+#include <vector>
 
 Image Xex2LoadImage(const uint8_t* data)
 {
@@ -77,6 +78,36 @@ Image Xex2LoadImage(const uint8_t* data)
 
         image.Map(reinterpret_cast<const char*>(section.Name), section.VirtualAddress, 
             section.Misc.VirtualSize, flags, image.data.get() + section.VirtualAddress);
+    }
+
+    auto* imports = Xex2FindOptionalHeader<XEX_IMPORT_HEADER>(header, XEX_HEADER_IMPORT_LIBRARIES);
+    if (imports != nullptr)
+    {
+        std::vector<std::string_view> stringTable;
+        auto* pStrTable = reinterpret_cast<const char*>(imports + 1);
+
+        for (size_t i = 0; i < imports->NumImports; i++)
+        {
+            stringTable.emplace_back(pStrTable);
+            pStrTable += strlen(pStrTable) + 1;
+        }
+
+        auto* library = (XEX_IMPORT_LIBRARY*)(((char*)imports) + sizeof(XEX_IMPORT_HEADER) + imports->SizeOfStringTable);
+        for (size_t i = 0; i < stringTable.size(); i++)
+        {
+            auto* descriptors = (XEX_IMPORT_DESCRIPTOR*)(library + 1);
+            for (size_t im = 0; im < library->NumberOfImports; im++)
+            {
+                auto originalThunk = (XEX_THUNK_DATA*)image.Find(descriptors[im].FirstThunk);
+                auto thunkType = originalThunk->Function >> 24;
+
+                if (thunkType == 1)
+                {
+                    uint32_t thunk[4] = { 0x00000060, 0x00000060, 0x00000060, 0x2000804E };
+                    memcpy(originalThunk, thunk, sizeof(thunk));
+                }
+            }
+        }
     }
 
     return image;
