@@ -322,35 +322,122 @@ int main()
                     std::println(f, "\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
                     break;
 
+                    // TODO: fpu operations require denormal flushing checks
                 case PPC_INST_FABS:
+                    std::println(f, "\tctx.f{}.f64 = fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FADD:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FADDS:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FCFID:
+                    // TODO: rounding mode?
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.s64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FCMPU:
+                    break;
+
                 case PPC_INST_FCTID:
+                    // TODO: rounding mode?
+                    std::println(f, "\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FCTIDZ:
+                    std::println(f, "\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FCTIWZ:
+                    std::println(f, "\tctx.f{}.s32 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FDIV:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 / ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FDIVS:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 / ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FMADD:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FMADDS:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FMR:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FMSUB:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FMSUBS:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FMUL:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FMULS:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FNABS:
+                    std::println(f, "\tctx.f{}.f64 = -fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FNEG:
+                    std::println(f, "\tctx.f{}.f64 = -ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FNMADDS:
+                    std::println(f, "\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FNMSUB:
+                    std::println(f, "\tctx.f{}.f64 = -(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FNMSUBS:
+                    std::println(f, "\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FRES:
+                    std::println(f, "\tctx.f{}.f64 = 1.0 / ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FRSP:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FSEL:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 >= 0.0 ? ctx.f{}.f64 : ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_FSQRT:
+                    std::println(f, "\tctx.f{}.f64 = sqrt(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FSQRTS:
+                    std::println(f, "\tctx.f{}.f64 = float(sqrt(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_FSUB:
+                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_FSUBS:
+                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LBZ:
