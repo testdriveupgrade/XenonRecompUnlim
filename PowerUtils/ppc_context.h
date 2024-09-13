@@ -9,6 +9,7 @@
 #define _byteswap_ushort __builtin_bswap16
 #define _byteswap_ulong __builtin_bswap32
 #define _byteswap_uint64 __builtin_bswap64
+#define isnan __builtin_isnan
 #define PPC_FUNC __attribute__((weak,noinline))
 #else
 #include <intrin.h>
@@ -24,6 +25,8 @@
 #define PPC_STORE_U16(x, y) *(uint16_t*)(base + (x)) = _byteswap_ushort(y)
 #define PPC_STORE_U32(x, y) *(uint32_t*)(base + (x)) = _byteswap_ulong(y)
 #define PPC_STORE_U64(x, y) *(uint64_t*)(base + (x)) = _byteswap_uint64(y)
+
+typedef void PPCFunc(struct PPCContext& __restrict ctx, uint8_t* base);
 
 struct PPCRegister
 {
@@ -82,6 +85,7 @@ typedef float float128[4];
 
 struct PPCContext
 {
+    PPCFunc** fn;
     uint64_t lr;
     uint64_t ctr;
     PPCXERRegister xer;
