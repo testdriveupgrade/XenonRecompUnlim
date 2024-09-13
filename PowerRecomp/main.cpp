@@ -168,7 +168,13 @@ int main()
                     break;
 
                 case PPC_INST_BCTR:
+                    std::println(f, "\tctx.fn[ctx.ctr / 4](ctx, base);");
+                    std::println(f, "\treturn;");
+                    break;
+
                 case PPC_INST_BCTRL:
+                    std::println(f, "\tctx.lr = 0x{:X};", base);
+                    std::println(f, "\tctx.fn[ctx.ctr / 4](ctx, base);");
                     break;
 
                 case PPC_INST_BDNZ:
@@ -204,7 +210,7 @@ int main()
 
                 case PPC_INST_BL:
                     std::println(f, "\tctx.lr = 0x{:X};", base);
-                    std::println(f, "\tctx.fn[0x{:X}](ctx, base);", base / 4);
+                    std::println(f, "\tctx.fn[0x{:X}](ctx, base);", insn.operands[0] / 4);
                     break;
 
                 case PPC_INST_BLE:
