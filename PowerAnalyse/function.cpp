@@ -18,9 +18,19 @@ size_t Function::SearchBlock(size_t address) const
         const auto begin = base + block.base;
         const auto end = begin + block.size;
 
-        if (address >= begin && address < end)
+        if (begin != end)
         {
-            return i;
+            if (address >= begin && address < end)
+            {
+                return i;
+            }
+        }
+        else // fresh block
+        {
+            if (address == begin)
+            {
+                return i;
+            }
         }
     }
 
@@ -53,6 +63,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
         }
 
         auto& curBlock = blocks[blockStack.back()];
+        DEBUG(const auto blockBase = curBlock.base);
         const auto instruction = std::byteswap(*data);
 
         const auto op = PPC_OP(instruction);
@@ -98,7 +109,6 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
             if (lBlock == -1)
             {
-                DEBUG(const auto blockBase = curBlock.base);
                 blocks.emplace_back(lBase, 0).projectedSize = rBase - lBase;
                 lBlock = blocks.size() - 1;
 
@@ -110,7 +120,6 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
             auto rBlock = fn.SearchBlock(base + rBase);
             if (rBlock == -1)
             {
-                DEBUG(const auto blockBase = curBlock.base);
                 blocks.emplace_back(branchDest - base, 0);
                 rBlock = blocks.size() - 1;
 
@@ -120,7 +129,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
             RESTORE_DATA();
         }
-        else if (op == PPC_OP_B || instruction == 0 || (insn.opcode != nullptr && insn.opcode->id == PPC_INST_BLR)) // b, blr, end padding
+        else if (op == PPC_OP_B || instruction == 0 || (op == PPC_OP_CTR && (xop == 16 || xop == 528))) // b, blr, end padding
         {
             if (!isLink)
             {
@@ -135,7 +144,6 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                         continue;
                     }
 
-                    // Keep analyzing if we have continuity
                     assert(!PPC_BA(instruction));
                     const auto branchDest = addr + PPC_BI(instruction);
 
@@ -160,13 +168,34 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
                     if (branchBlock == -1)
                     {
-                        DEBUG(const auto blockBase = curBlock.base);
                         blocks.emplace_back(branchBase, 0, sizeProjection);
 
                         blockStack.emplace_back(blocks.size() - 1);
+                        
                         DEBUG(blocks.back().parent = blockBase);
                         RESTORE_DATA();
                         continue;
+                    }
+                }
+                else if (op == PPC_OP_CTR)
+                {
+                    // 5th bit of BO tells cpu to ignore the counter, which is a blr/bctr otherwise it's conditional
+                    const auto conditional = !(PPC_BO(instruction) & 0x10);
+                    if (conditional)
+                    {
+                        // right block's just going to return
+                        const auto lBase = (addr - base) + 4;
+                        auto lBlock = fn.SearchBlock(lBase);
+                        if (lBlock == -1)
+                        {
+                            blocks.emplace_back(lBase, 0);
+                            lBlock = blocks.size() - 1;
+
+                            DEBUG(blocks[lBlock].parent = blockBase);
+                            blockStack.emplace_back(lBlock);
+                            RESTORE_DATA();
+                            continue;
+                        }
                     }
                 }
 
