@@ -14,9 +14,14 @@ public:
         }
 
         size_t closest{ address - iter->address };
-        auto match = iter;
+        auto match = end();
         for (; iter != end(); ++iter)
         {
+            if (address < iter->address || address >= iter->address + iter->size)
+            {
+                continue;
+            }
+
             const size_t distance = address - iter->address;
             if (distance <= closest)
             {
@@ -37,9 +42,14 @@ public:
         }
 
         size_t closest{ address - iter->address };
-        auto match = iter;
+        auto match = end();
         for (; iter != end(); ++iter)
         {
+            if (address < iter->address || address >= iter->address + iter->size)
+            {
+                continue;
+            }
+
             const size_t distance = address - iter->address;
             if (distance <= closest)
             {
