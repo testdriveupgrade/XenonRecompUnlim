@@ -96,6 +96,9 @@ int main()
                     break;
 
                 case PPC_INST_ADDIC:
+                    std::println(f, "\tctx.xer.ca = _addcarry_u64(0, ctx.r{}.u64, uint64_t(int64_t({})), &ctx.r{}.u64);", insn.operands[1], static_cast<int32_t>(insn.operands[2]), insn.operands[0]);
+                    if (insn.opcode->opcode & 0x1)
+                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ADDIS:
@@ -103,6 +106,9 @@ int main()
                     break;
 
                 case PPC_INST_ADDZE:
+                    std::println(f, "\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ctx.r{}.u64, 0, &ctx.r{}.u64);", insn.operands[1], insn.operands[0]);
+                    if (insn.opcode->opcode & 0x1)
+                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_AND:
@@ -783,8 +789,19 @@ int main()
                     break;
 
                 case PPC_INST_SUBFC:
+                    std::println(f, "\tctx.xer.ca = _subborrow_u64(0, ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[2], insn.operands[1], insn.operands[0]);
+                    if (insn.opcode->opcode & 0x1)
+                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_SUBFE:
+                    std::println(f, "\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ~ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    break;
+
                 case PPC_INST_SUBFIC:
+                    std::println(f, "\tctx.xer.ca = _subborrow_u64(0, uint64_t(int64_t({})), ctx.r{}.u64, &ctx.r{}.u64);", static_cast<int32_t>(insn.operands[2]), insn.operands[1], insn.operands[0]);
+                    break;
+
                 case PPC_INST_SYNC:
                 case PPC_INST_TDLGEI:
                 case PPC_INST_TDLLEI:
