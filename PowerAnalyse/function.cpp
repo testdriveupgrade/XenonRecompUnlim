@@ -120,7 +120,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
             RESTORE_DATA();
         }
-        else if (op == PPC_OP_B || instruction == 0 || insn.opcode->id == PPC_INST_BLR) // b, blr, end padding
+        else if (op == PPC_OP_B || instruction == 0 || (insn.opcode != nullptr && insn.opcode->id == PPC_INST_BLR)) // b, blr, end padding
         {
             if (!isLink)
             {
@@ -172,6 +172,11 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
                 RESTORE_DATA();
             }
+        }
+        else if (insn.opcode == nullptr)
+        {
+            blockStack.pop_back();
+            RESTORE_DATA();
         }
     }
 
