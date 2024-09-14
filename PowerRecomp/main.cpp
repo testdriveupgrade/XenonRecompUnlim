@@ -5,26 +5,55 @@
 #include <print>
 #include <disasm.h>
 #include <filesystem>
+#include <xbox.h>
+#include <cassert>
 
-#define TEST_FILE "add-cond.elf"
+#define TEST_FILE "default.xex"
 
 int main()
 {
     const auto file = LoadFile(TEST_FILE).value();
     auto image = Image::ParseImage(file.data(), file.size()).value();
 
-    // TODO: Load functions from an existing database
+    std::println("Analysing functions...");
+
+    uint32_t cxxFrameHandler = std::byteswap(0x831B1C90);
+    uint32_t cSpecificFrameHandler = std::byteswap(0x8324B3BC);
+    image.symbols.emplace("__CxxFrameHandler", 0x831B1C90, 0x38, Symbol_Function);
+    image.symbols.emplace("__C_specific_handler", 0x82BD7780, 0x38, Symbol_Function);
+    image.symbols.emplace("__memcpy", 0x831B0ED0, 0x488, Symbol_Function);
+    image.symbols.emplace("__memset", 0x831B0BA0, 0xA0, Symbol_Function);
+    image.symbols.emplace("__blkmov", 0x831B1358, 0xA8, Symbol_Function);
+    image.symbols.emplace(std::format("sub_{:X}", 0x82EF5D78), 0x82EF5D78, 0x3F8, Symbol_Function);
+
     std::vector<Function> functions;
+    auto& pdata = *image.Find(".pdata");
+    size_t count = pdata.size / sizeof(IMAGE_CE_RUNTIME_FUNCTION);
+    auto* pf = (IMAGE_CE_RUNTIME_FUNCTION*)pdata.data;
+    for (size_t i = 0; i < count; i++)
+    {
+        auto fn = pf[i];
+        fn.BeginAddress = std::byteswap(fn.BeginAddress);
+        fn.Data = std::byteswap(fn.Data);
+
+        auto& f = functions.emplace_back();
+        f.base = fn.BeginAddress;
+        f.size = fn.FunctionLength * 4;
+
+        image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
+    }
+
+    std::vector<Function> missingFunctions;
     for (const auto& section : image.sections)
     {
         if (!(section.flags & SectionFlags_Code))
         {
             continue;
         }
-
         size_t base = section.base;
         uint8_t* data = section.data;
         uint8_t* dataEnd = section.data + section.size;
+        const Symbol* prevSymbol = nullptr;
         while (data < dataEnd)
         {
             if (*(uint32_t*)data == 0)
@@ -34,43 +63,81 @@ int main()
                 continue;
             }
 
-            const auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
-            data += fn.size;
-            base += fn.size;
+            if (*(uint32_t*)data == cxxFrameHandler || *(uint32_t*)data == cSpecificFrameHandler)
+            {
+                data += 8;
+                base += 8;
+                continue;
+            }
 
-            image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+            auto fnSymbol = image.symbols.find(base);
+            if (fnSymbol != image.symbols.end() && fnSymbol->type == Symbol_Function)
+            {
+                assert(fnSymbol->address == base);
+
+                prevSymbol = &*fnSymbol;
+                base += fnSymbol->size;
+                data += fnSymbol->size;
+            }
+            else
+            {
+                auto& missingFn = missingFunctions.emplace_back(Function::Analyze(data, dataEnd - data, base));
+                image.symbols.emplace(std::format("sub_{:X}", missingFn.base), missingFn.base, missingFn.size, Symbol_Function);
+
+                base += missingFn.size;
+                data += missingFn.size;
+            }
         }
     }
+    
+    std::string out;
+    out.reserve(512 * 1024 * 1024);
 
-    std::filesystem::create_directory("out");
-    FILE* f = fopen("out/" TEST_FILE ".cpp", "w");
-    std::println(f, "#include <ppc_context.h>\n");
-
-    for (const auto& fn : functions)
+    auto print = [&]<class... Args>(std::format_string<Args...> fmt, Args&&... args)
     {
+        std::vformat_to(std::back_inserter(out), fmt.get(), std::make_format_args(args...));
+    };
+
+    auto println = [&]<class... Args>(std::format_string<Args...> fmt, Args&&... args)
+    {
+        std::vformat_to(std::back_inserter(out), fmt.get(), std::make_format_args(args...));
+        out += '\n';
+    };
+
+    println("#include <ppc_context.h>\n");
+
+    for (auto& symbol : image.symbols)
+        println("PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base);", symbol.name);
+
+    println("");
+
+    for (size_t funcIdx = 0; funcIdx < functions.size(); funcIdx++)
+    {
+        if ((funcIdx % 100) == 0)
+            std::println("Recompiling functions... {}%", static_cast<float>(funcIdx) / functions.size() * 100.0f);
+
+        auto& fn = functions[funcIdx];
         auto base = fn.base;
         auto end = base + fn.size;
         auto* data = (uint32_t*)image.Find(base);
 
-        std::string name = "";
-        auto symbol = image.symbols.find(base);
+        auto symbol = image.symbols.find(fn.base);
         if (symbol != image.symbols.end())
         {
-            name = symbol->name;
+            println("PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base) {{", symbol->name);
         }
         else
         {
-            name = std::format("sub_{:X}", base);
+            println("PPC_FUNC void sub_{:X}(PPCContext& __restrict ctx, uint8_t* base) {{", fn.base);
         }
 
-        std::println(f, "PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base) {{", name);
-        std::println(f, "\tPPCRegister temp;\n");
-        std::println(f, "\tuint32_t ea;\n");
+        println("\tPPCRegister temp;");
+        println("\tuint32_t ea;\n");
 
         ppc_insn insn;
         while (base < end)
         {
-            std::println(f, "loc_{:X}:", base);
+            println("loc_{:X}:", base);
 
             ppc::Disassemble(data, 4, base, insn);
 
@@ -78,77 +145,92 @@ int main()
             ++data;
             if (insn.opcode == nullptr)
             {
-                std::println(f, "\t// {:x} {}", base - 4, insn.op_str);
+                println("\t// {:x} {}", base - 4, insn.op_str);
             }
             else
             {
-                std::println(f, "\t// {:x} {} {}", base - 4, insn.opcode->name, insn.op_str);
+                println("\t// {:x} {} {}", base - 4, insn.opcode->name, insn.op_str);
+
+                auto printFunctionCall = [&](uint32_t ea)
+                {
+                    auto targetSymbol = image.symbols.find(ea);
+
+                    if (targetSymbol != image.symbols.end() && targetSymbol->type == Symbol_Function)
+                    {
+                        println("\t{}(ctx, base);", targetSymbol->name);
+                    }
+                    else
+                    {
+                        println("\tctx.fn[0x{:X}](ctx, base);", ea / 4);
+                    }
+                };
 
                 auto printConditionalBranch = [&](bool not_, const std::string_view& cond)
                 {
                     if (insn.operands[1] < fn.base || insn.operands[1] >= fn.base + fn.size)
                     {
-                        std::println(f, "\tif ({}ctx.cr{}.{}) {{", not_ ? "!" : "", insn.operands[0], cond);
-                        std::println(f, "\t\tctx.fn[0x{:X}](ctx, base);", insn.operands[1] / 4);
-                        std::println(f, "\t\treturn;");
-                        std::println(f, "\t}}");
+                        println("\tif ({}ctx.cr{}.{}) {{", not_ ? "!" : "", insn.operands[0], cond);
+                        print("\t");
+                        printFunctionCall(insn.operands[1]);
+                        println("\t\treturn;");
+                        println("\t}}");
                     }
                     else
                     {
-                        std::println(f, "\tif ({}ctx.cr{}.{}) goto loc_{:X};", not_ ? "!" : "", insn.operands[0], cond, insn.operands[1]);
+                        println("\tif ({}ctx.cr{}.{}) goto loc_{:X};", not_ ? "!" : "", insn.operands[0], cond, insn.operands[1]);
                     }
                 };
 
                 switch (insn.opcode->id)
                 {
                 case PPC_INST_ADD:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 + ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 + ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ADDI:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
                     break;
 
                 case PPC_INST_ADDIC:
-                    std::println(f, "\tctx.xer.ca = _addcarry_u64(0, ctx.r{}.u64, uint64_t(int64_t({})), &ctx.r{}.u64);", insn.operands[1], static_cast<int32_t>(insn.operands[2]), insn.operands[0]);
+                    println("\tctx.xer.ca = _addcarry_u64(0, ctx.r{}.u64, uint64_t(int64_t({})), &ctx.r{}.u64);", insn.operands[1], static_cast<int32_t>(insn.operands[2]), insn.operands[0]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ADDIS:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2] << 16));
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2] << 16));
                     break;
 
                 case PPC_INST_ADDZE:
-                    std::println(f, "\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ctx.r{}.u64, 0, &ctx.r{}.u64);", insn.operands[1], insn.operands[0]);
+                    println("\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ctx.r{}.u64, 0, &ctx.r{}.u64);", insn.operands[1], insn.operands[0]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_AND:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 & ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ANDC:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 & ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ANDI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ANDIS:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ATTN:
@@ -158,27 +240,27 @@ int main()
                 case PPC_INST_B:
                     if (insn.operands[0] < fn.base || insn.operands[0] >= fn.base + fn.size)
                     {
-                        std::println(f, "\tctx.fn[0x{:X}](ctx, base);", insn.operands[0] / 4);
-                        std::println(f, "\treturn;");
+                        printFunctionCall(insn.operands[0]);
+                        println("\treturn;");
                     }
                     else
                     {
-                        std::println(f, "\tgoto loc_{:X};", insn.operands[0]);
+                        println("\tgoto loc_{:X};", insn.operands[0]);
                     }
                     break;
 
                 case PPC_INST_BCTR:
-                    std::println(f, "\tctx.fn[ctx.ctr / 4](ctx, base);");
-                    std::println(f, "\treturn;");
+                    println("\tctx.fn[ctx.ctr / 4](ctx, base);");
+                    println("\treturn;");
                     break;
 
                 case PPC_INST_BCTRL:
-                    std::println(f, "\tctx.lr = 0x{:X};", base);
-                    std::println(f, "\tctx.fn[ctx.ctr / 4](ctx, base);");
+                    println("\tctx.lr = 0x{:X};", base);
+                    println("\tctx.fn[ctx.ctr / 4](ctx, base);");
                     break;
 
                 case PPC_INST_BDNZ:
-                    std::println(f, "\tif (--ctx.ctr != 0) goto loc_{:X};", insn.operands[0]);
+                    println("\tif (--ctx.ctr != 0) goto loc_{:X};", insn.operands[0]);
                     break;
 
                 case PPC_INST_BDNZF:
@@ -189,7 +271,7 @@ int main()
                     break;
 
                 case PPC_INST_BEQLR:
-                    std::println(f, "\tif (ctx.cr{}.eq) return;", insn.operands[0]);
+                    println("\tif (ctx.cr{}.eq) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BGE:
@@ -197,7 +279,7 @@ int main()
                     break;
 
                 case PPC_INST_BGELR:
-                    std::println(f, "\tif (!ctx.cr{}.lt) return;", insn.operands[0]);
+                    println("\tif (!ctx.cr{}.lt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BGT:
@@ -205,12 +287,12 @@ int main()
                     break;
 
                 case PPC_INST_BGTLR:
-                    std::println(f, "\tif (ctx.cr{}.gt) return;", insn.operands[0]);
+                    println("\tif (ctx.cr{}.gt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BL:
-                    std::println(f, "\tctx.lr = 0x{:X};", base);
-                    std::println(f, "\tctx.fn[0x{:X}](ctx, base);", insn.operands[0] / 4);
+                    println("\tctx.lr = 0x{:X};", base);
+                    printFunctionCall(insn.operands[0]);
                     break;
 
                 case PPC_INST_BLE:
@@ -218,11 +300,11 @@ int main()
                     break;
 
                 case PPC_INST_BLELR:
-                    std::println(f, "\tif (!ctx.cr{}.gt) return;", insn.operands[0]);
+                    println("\tif (!ctx.cr{}.gt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BLR:
-                    std::println(f, "\treturn;");
+                    println("\treturn;");
                     break;
 
                 case PPC_INST_BLRL:
@@ -233,7 +315,7 @@ int main()
                     break;
 
                 case PPC_INST_BLTLR:
-                    std::println(f, "\tif (ctx.cr{}.lt) return;", insn.operands[0]);
+                    println("\tif (ctx.cr{}.lt) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_BNE:
@@ -244,7 +326,7 @@ int main()
                     break;
 
                 case PPC_INST_BNELR:
-                    std::println(f, "\tif (!ctx.cr{}.eq) return;", insn.operands[0]);
+                    println("\tif (!ctx.cr{}.eq) return;", insn.operands[0]);
                     break;
 
                 case PPC_INST_CCTPL:
@@ -256,53 +338,53 @@ int main()
                     break;
 
                 case PPC_INST_CLRLDI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 & 0x{:X};", insn.operands[0], insn.operands[1], (1ull << (64 - insn.operands[2])) - 1);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 & 0x{:X};", insn.operands[0], insn.operands[1], (1ull << (64 - insn.operands[2])) - 1);
                     break;
 
                 case PPC_INST_CLRLWI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u32 & 0x{:X};", insn.operands[0], insn.operands[1], (1ull << (32 - insn.operands[2])) - 1);
+                    println("\tctx.r{}.u64 = ctx.r{}.u32 & 0x{:X};", insn.operands[0], insn.operands[1], (1ull << (32 - insn.operands[2])) - 1);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_CMPD:
-                    std::println(f, "\tctx.cr{}.compare<int64_t>(ctx.r{}.s64, ctx.r{}.s64, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare<int64_t>(ctx.r{}.s64, ctx.r{}.s64, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPDI:
-                    std::println(f, "\tctx.cr{}.compare<int64_t>(ctx.r{}.s64, {}, ctx.xer);", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
+                    println("\tctx.cr{}.compare<int64_t>(ctx.r{}.s64, {}, ctx.xer);", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
                     break;
 
                 case PPC_INST_CMPLD:
-                    std::println(f, "\tctx.cr{}.compare<uint64_t>(ctx.r{}.u64, ctx.r{}.u64, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare<uint64_t>(ctx.r{}.u64, ctx.r{}.u64, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPLDI:
-                    std::println(f, "\tctx.cr{}.compare<uint64_t>(ctx.r{}.u64, {}, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare<uint64_t>(ctx.r{}.u64, {}, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPLW:
-                    std::println(f, "\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, ctx.r{}.u32, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, ctx.r{}.u32, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPLWI:
-                    std::println(f, "\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, {}, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare<uint32_t>(ctx.r{}.u32, {}, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPW:
-                    std::println(f, "\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, ctx.r{}.s32, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, ctx.r{}.s32, ctx.xer);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_CMPWI:
-                    std::println(f, "\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, {}, ctx.xer);", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
+                    println("\tctx.cr{}.compare<int32_t>(ctx.r{}.s32, {}, ctx.xer);", insn.operands[0], insn.operands[1], int32_t(insn.operands[2]));
                     break;
 
                 case PPC_INST_CNTLZD:
-                    std::println(f, "\tctx.r{}.u64 = __lzcnt64(ctx.r{}.u64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.u64 = __lzcnt64(ctx.r{}.u64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_CNTLZW:
-                    std::println(f, "\tctx.r{}.u64 = __lzcnt(ctx.r{}.u32);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.u64 = __lzcnt(ctx.r{}.u32);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_DB16CYC:
@@ -331,213 +413,213 @@ int main()
                     break;
 
                 case PPC_INST_EXTSB:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s8;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s8;", insn.operands[0], insn.operands[1]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_EXTSH:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s16;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s16;", insn.operands[0], insn.operands[1]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_EXTSW:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
                     break;
 
                     // TODO: fpu operations require denormal flushing checks
                 case PPC_INST_FABS:
-                    std::println(f, "\tctx.f{}.f64 = fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FADD:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FADDS:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FCFID:
                     // TODO: rounding mode?
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.s64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = ctx.f{}.s64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCMPU:
-                    std::println(f, "\tctx.cr{}.compare(ctx.f{}.f64, ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.cr{}.compare(ctx.f{}.f64, ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FCTID:
                     // TODO: rounding mode?
-                    std::println(f, "\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCTIDZ:
-                    std::println(f, "\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCTIWZ:
-                    std::println(f, "\tctx.f{}.s32 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s32 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FDIV:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 / ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 / ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FDIVS:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 / ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64 / ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FMADD:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FMADDS:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FMR:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FMSUB:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FMSUBS:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FMUL:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FMULS:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FNABS:
-                    std::println(f, "\tctx.f{}.f64 = -fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = -fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FNEG:
-                    std::println(f, "\tctx.f{}.f64 = -ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = -ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FNMADDS:
-                    std::println(f, "\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FNMSUB:
-                    std::println(f, "\tctx.f{}.f64 = -(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = -(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FNMSUBS:
-                    std::println(f, "\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FRES:
-                    std::println(f, "\tctx.f{}.f64 = 1.0 / ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = 1.0 / ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FRSP:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FSEL:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 >= 0.0 ? ctx.f{}.f64 : ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 >= 0.0 ? ctx.f{}.f64 : ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FSQRT:
-                    std::println(f, "\tctx.f{}.f64 = sqrt(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = sqrt(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FSQRTS:
-                    std::println(f, "\tctx.f{}.f64 = float(sqrt(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = float(sqrt(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FSUB:
-                    std::println(f, "\tctx.f{}.f64 = ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_FSUBS:
-                    std::println(f, "\tctx.f{}.f64 = float(ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = float(ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LBZ:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U8({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U8({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LBZU:
-                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U8(ea);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U8(ea);", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_LBZX:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U8(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U8(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LD:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LDARX:
                     break;
 
                 case PPC_INST_LDU:
-                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U64(ea);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U64(ea);", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_LDX:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LFD:
-                    std::println(f, "\tctx.f{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.f{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LFDX:
-                    std::println(f, "\tctx.f{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LFS:
-                    std::println(f, "\ttemp.u32 = PPC_LOAD_U32({} + ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
+                    println("\ttemp.u32 = PPC_LOAD_U32({} + ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
                     break;
 
                 case PPC_INST_LFSX:
-                    std::println(f, "\ttemp.u32 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[1], insn.operands[2]);
-                    std::println(f, "\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
+                    println("\ttemp.u32 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[1], insn.operands[2]);
+                    println("\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
                     break;
 
                 case PPC_INST_LHA:
-                    std::println(f, "\tctx.r{}.s64 = int16_t(PPC_LOAD_U16({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.s64 = int16_t(PPC_LOAD_U16({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LHAX:
-                    std::println(f, "\tctx.r{}.s64 = int16_t(PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = int16_t(PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LHZ:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U16({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U16({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LHZX:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LI:
                     // TODO: validate the sign extend
-                    std::println(f, "\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1]));
+                    println("\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LIS:
                     // TODO: validate the sign extend
-                    std::println(f, "\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1] << 16));
+                    println("\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1] << 16));
                     break;
 
                 case PPC_INST_LVEWX:
@@ -553,18 +635,18 @@ int main()
                     break;
 
                 case PPC_INST_LWA:
-                    std::println(f, "\tctx.r{}.s64 = int32_t(PPC_LOAD_U32({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.s64 = int32_t(PPC_LOAD_U32({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LWARX:
                     break;
 
                 case PPC_INST_LWAX:
-                    std::println(f, "\tctx.r{}.s64 = int32_t(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = int32_t(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LWBRX:
-                    std::println(f, "\tctx.r{}.u64 = _byteswap_ulong(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = _byteswap_ulong(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_LWSYNC:
@@ -572,17 +654,17 @@ int main()
                     break;
 
                 case PPC_INST_LWZ:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U32({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U32({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_LWZU:
-                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U32(ea);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U32(ea);", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_LWZX:
-                    std::println(f, "\tctx.r{}.u64 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MFCR:
@@ -590,7 +672,7 @@ int main()
                     break;
 
                 case PPC_INST_MFLR:
-                    std::println(f, "\tctx.r{}.u64 = ctx.lr;", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ctx.lr;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MFMSR:
@@ -599,23 +681,23 @@ int main()
                     break;
 
                 case PPC_INST_MR:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_MTCR:
                     break;
 
                 case PPC_INST_MTCTR:
-                    std::println(f, "\tctx.ctr = ctx.r{}.u64;", insn.operands[0]);
+                    println("\tctx.ctr = ctx.r{}.u64;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MTFSF:
                     break;
 
                 case PPC_INST_MTLR:
-                    std::println(f, "\tctx.lr = ctx.r{}.u64;", insn.operands[0]);
+                    println("\tctx.lr = ctx.r{}.u64;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MTMSRD:
@@ -626,36 +708,36 @@ int main()
 
                 case PPC_INST_MULHW:
                     // TODO: might be having 32 bit truncation here
-                    std::println(f, "\tctx.r{}.s64 = int64_t(ctx.r{}.s32 * ctx.r{}.s32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = int64_t(ctx.r{}.s32 * ctx.r{}.s32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULHWU:
                     // TODO: might be having 32 bit truncation here
-                    std::println(f, "\tctx.r{}.u64 = uint64_t(ctx.r{}.u32 * ctx.r{}.u32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = uint64_t(ctx.r{}.u32 * ctx.r{}.u32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULLD:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 * ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 * ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULLI:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 * {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 * {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
                     break;
 
                 case PPC_INST_MULLW:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s32 * ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s32 * ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_NAND:
-                    std::println(f, "\tctx.r{}.u64 = ~(ctx.r{}.u64 & ctx.r{}.u64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ~(ctx.r{}.u64 & ctx.r{}.u64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_NEG:
-                    std::println(f, "\tctx.r{}.s64 = -ctx.r{}.s64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.s64 = -ctx.r{}.s64;", insn.operands[0], insn.operands[1]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_NOP:
@@ -663,31 +745,31 @@ int main()
                     break;
 
                 case PPC_INST_NOR:
-                    std::println(f, "\tctx.r{}.u64 = ~(ctx.r{}.u64 | ctx.r{}.u64);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ~(ctx.r{}.u64 | ctx.r{}.u64);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_NOT:
-                    std::println(f, "\tctx.r{}.u64 = ~ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.r{}.u64 = ~ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_OR:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 | ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ORC:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 | ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_ORI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 | {};", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_ORIS:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 | {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 | {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
                     break;
 
                 case PPC_INST_RLDICL:
@@ -709,68 +791,68 @@ int main()
                     break;
 
                 case PPC_INST_STB:
-                    std::println(f, "\tPPC_STORE_U8({} + ctx.r{}.u32, ctx.r{}.u8);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U8({} + ctx.r{}.u32, ctx.r{}.u8);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STBU:
-                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tPPC_STORE_U8(ea, ctx.r{}.u8);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tPPC_STORE_U8(ea, ctx.r{}.u8);", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[0]);
                     break;
 
                 case PPC_INST_STBX:
-                    std::println(f, "\tPPC_STORE_U8(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u8);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U8(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u8);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STD:
-                    std::println(f, "\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.r{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.r{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STDCX:
                     break;
 
                 case PPC_INST_STDU:
-                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tPPC_STORE_U64(ea, ctx.r{}.u64);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tPPC_STORE_U64(ea, ctx.r{}.u64);", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[0]);
                     break;
 
                 case PPC_INST_STDX:
-                    std::println(f, "\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFD:
-                    std::println(f, "\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.f{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.f{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFDX:
-                    std::println(f, "\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFIWX:
-                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFS:
-                    std::println(f, "\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
-                    std::println(f, "\tPPC_STORE_U32({} + ctx.r{}.u32, temp.u32);", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
+                    println("\tPPC_STORE_U32({} + ctx.r{}.u32, temp.u32);", int32_t(insn.operands[1]), insn.operands[2]);
                     break;
 
                 case PPC_INST_STFSX:
-                    std::println(f, "\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
-                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, temp.u32);", insn.operands[1], insn.operands[2]);
+                    println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
+                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, temp.u32);", insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_STH:
-                    std::println(f, "\tPPC_STORE_U16({} + ctx.r{}.u32, ctx.r{}.u16);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U16({} + ctx.r{}.u32, ctx.r{}.u16);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STHBRX:
-                    std::println(f, "\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ushort(ctx.r{}.u16));", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ushort(ctx.r{}.u16));", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STHX:
-                    std::println(f, "\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u16);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u16);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STVEHX:
@@ -785,50 +867,50 @@ int main()
                     break;
 
                 case PPC_INST_STW:
-                    std::println(f, "\tPPC_STORE_U32({} + ctx.r{}.u32, ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U32({} + ctx.r{}.u32, ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STWBRX:
-                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ulong(ctx.r{}.u32));", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ulong(ctx.r{}.u32));", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STWCX:
                     break;
 
                 case PPC_INST_STWU:
-                    std::println(f, "\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
-                    std::println(f, "\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
+                    println("\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[0]);
                     break;
 
                 case PPC_INST_STWUX:
-                    std::println(f, "\tea = ctx.r{}.u32 + ctx.r{}.u32;", insn.operands[1], insn.operands[2]);
-                    std::println(f, "\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
-                    std::println(f, "\tctx.r{}.u32 = ea;", insn.operands[0]);
+                    println("\tea = ctx.r{}.u32 + ctx.r{}.u32;", insn.operands[1], insn.operands[2]);
+                    println("\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[0]);
                     break;
 
                 case PPC_INST_STWX:
-                    std::println(f, "\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBF:
-                    std::println(f, "\tctx.r{}.s64 = ctx.r{}.s64 - ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 - ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBFC:
-                    std::println(f, "\tctx.xer.ca = _subborrow_u64(0, ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[2], insn.operands[1], insn.operands[0]);
+                    println("\tctx.xer.ca = _subborrow_u64(0, ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[2], insn.operands[1], insn.operands[0]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBFE:
-                    std::println(f, "\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ~ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    println("\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ~ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBFIC:
-                    std::println(f, "\tctx.xer.ca = _subborrow_u64(0, uint64_t(int64_t({})), ctx.r{}.u64, &ctx.r{}.u64);", static_cast<int32_t>(insn.operands[2]), insn.operands[1], insn.operands[0]);
+                    println("\tctx.xer.ca = _subborrow_u64(0, uint64_t(int64_t({})), ctx.r{}.u64, &ctx.r{}.u64);", static_cast<int32_t>(insn.operands[2]), insn.operands[1], insn.operands[0]);
                     break;
 
                 case PPC_INST_SYNC:
@@ -938,25 +1020,29 @@ int main()
                     break;
 
                 case PPC_INST_XOR:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 ^ ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 ^ ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (insn.opcode->opcode & 0x1)
-                        std::println(f, "\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_XORI:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_XORIS:
-                    std::println(f, "\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
                     break;
                 }
             }
         }
 
-        std::println(f, "}}\n");
+        println("}}\n");
     }
 
+    std::filesystem::create_directory("out");
+
+    FILE* f = fopen("out/" TEST_FILE ".cpp", "w");
+    fwrite(out.data(), 1, out.size(), f);
     fclose(f);
 
     return 0;
