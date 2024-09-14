@@ -7,25 +7,25 @@ class SymbolTable : public std::multiset<Symbol, SymbolComparer>
 public:
     const_iterator find(size_t address) const
     {
-        auto iter = std::multiset<Symbol, SymbolComparer>::find(address);
-        if (iter == end())
+        auto [beginIt, endIt] = equal_range(address);
+        if (beginIt == endIt)
         {
-            return iter;
+            return end();
         }
 
-        size_t closest{ address - iter->address };
+        size_t closest{ address - beginIt->address };
         auto match = end();
-        for (; iter != end(); ++iter)
+        for (auto it = beginIt; it != endIt; ++it)
         {
-            if (address < iter->address || address >= iter->address + iter->size)
+            if (address < it->address || address >= it->address + it->size)
             {
                 continue;
             }
 
-            const size_t distance = address - iter->address;
+            const size_t distance = address - it->address;
             if (distance <= closest)
             {
-                match = iter;
+                match = it;
                 closest = distance;
             }
         }
@@ -35,25 +35,25 @@ public:
 
     iterator find(size_t address)
     {
-        auto iter = std::multiset<Symbol, SymbolComparer>::find(address);
-        if (iter == end())
+        auto [beginIt, endIt] = equal_range(address);
+        if (beginIt == endIt)
         {
-            return iter;
+            return end();
         }
 
-        size_t closest{ address - iter->address };
+        size_t closest{ address - beginIt->address };
         auto match = end();
-        for (; iter != end(); ++iter)
+        for (auto it = beginIt; it != endIt; ++it)
         {
-            if (address < iter->address || address >= iter->address + iter->size)
+            if (address < it->address || address >= it->address + it->size)
             {
                 continue;
             }
 
-            const size_t distance = address - iter->address;
+            const size_t distance = address - it->address;
             if (distance <= closest)
             {
-                match = iter;
+                match = it;
                 closest = distance;
             }
         }

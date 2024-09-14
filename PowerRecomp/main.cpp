@@ -113,7 +113,7 @@ int main()
 
     for (size_t funcIdx = 0; funcIdx < functions.size(); funcIdx++)
     {
-        if ((funcIdx % 100) == 0)
+        if ((funcIdx % 1000) == 0)
             std::println("Recompiling functions... {}%", static_cast<float>(funcIdx) / functions.size() * 100.0f);
 
         auto& fn = functions[funcIdx];
