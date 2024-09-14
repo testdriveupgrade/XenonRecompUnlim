@@ -190,7 +190,10 @@ int main()
                     break;
 
                 case PPC_INST_ADDI:
-                    println("\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
+                    print("\tctx.r{}.s64 = ", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.s64 + ", insn.operands[1]);
+                    println("{};", static_cast<int32_t>(insn.operands[2]));
                     break;
 
                 case PPC_INST_ADDIC:
@@ -200,7 +203,10 @@ int main()
                     break;
 
                 case PPC_INST_ADDIS:
-                    println("\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2] << 16));
+                    print("\tctx.r{}.s64 = ", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.s64 + ", insn.operands[1]);
+                    println("{};", static_cast<int32_t>(insn.operands[2] << 16));
                     break;
 
                 case PPC_INST_ADDZE:
@@ -264,6 +270,8 @@ int main()
                     break;
 
                 case PPC_INST_BDNZF:
+                    // NOTE: assuming eq here as a shortcut because all the instructions in the game do that
+                    println("\tif (--ctx.ctr != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0], insn.operands[2]);
                     break;
 
                 case PPC_INST_BEQ:
@@ -308,6 +316,7 @@ int main()
                     break;
 
                 case PPC_INST_BLRL:
+                    println("\tctx.fn[ctx.lr / 4](ctx, base);");
                     break;
 
                 case PPC_INST_BLT:
@@ -323,6 +332,10 @@ int main()
                     break;
 
                 case PPC_INST_BNECTR:
+                    println("\tif (!ctx.cr{}.eq) {{", insn.operands[0]);
+                    println("\t\tctx.fn[ctx.ctr / 4](ctx, base);");
+                    println("\t\treturn;");
+                    println("\t}}");
                     break;
 
                 case PPC_INST_BNELR:
@@ -402,10 +415,26 @@ int main()
                 case PPC_INST_DCBTST:
                 case PPC_INST_DCBZ:
                 case PPC_INST_DCBZL:
+                    break;
+
                 case PPC_INST_DIVD:
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 / ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_DIVDU:
+                    println("\tctx.r{}.u64 = ctx.r{}.u64 / ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_DIVW:
+                    println("\tctx.r{}.s32 = ctx.r{}.s32 / ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_DIVWU:
+                    println("\tctx.r{}.u32 = ctx.r{}.u32 / ctx.r{}.u32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_EIEIO:
@@ -548,7 +577,10 @@ int main()
                     break;
 
                 case PPC_INST_LBZ:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U8({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U8(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{});", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LBZU:
@@ -558,11 +590,17 @@ int main()
                     break;
 
                 case PPC_INST_LBZX:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U8(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U8(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
                     break;
 
                 case PPC_INST_LD:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{});", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LDARX:
@@ -575,50 +613,75 @@ int main()
                     break;
 
                 case PPC_INST_LDX:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
                     break;
 
                 case PPC_INST_LFD:
-                    println("\tctx.f{}.u64 = PPC_LOAD_U64({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.f{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{});", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LFDX:
-                    println("\tctx.f{}.u64 = PPC_LOAD_U64(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.f{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
                     break;
 
                 case PPC_INST_LFS:
-                    println("\ttemp.u32 = PPC_LOAD_U32({} + ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\ttemp.u32 = PPC_LOAD_U32(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{});", int32_t(insn.operands[1]));
                     println("\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
                     break;
 
                 case PPC_INST_LFSX:
-                    println("\ttemp.u32 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[1], insn.operands[2]);
+                    print("\ttemp.u32 = PPC_LOAD_U32(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
                     println("\tctx.f{}.f64 = temp.f32;", insn.operands[0]);
                     break;
 
                 case PPC_INST_LHA:
-                    println("\tctx.r{}.s64 = int16_t(PPC_LOAD_U16({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.r{}.s64 = int16_t(PPC_LOAD_U16(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}));", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LHAX:
-                    println("\tctx.r{}.s64 = int16_t(PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.s64 = int16_t(PPC_LOAD_U16(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32));", insn.operands[2]);
                     break;
 
                 case PPC_INST_LHZ:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U16({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U16(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{});", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LHZX:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U16(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U16(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
                     break;
 
                 case PPC_INST_LI:
-                    // TODO: validate the sign extend
                     println("\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LIS:
-                    // TODO: validate the sign extend
                     println("\tctx.r{}.s64 = {};", insn.operands[0], int32_t(insn.operands[1] << 16));
                     break;
 
@@ -635,18 +698,27 @@ int main()
                     break;
 
                 case PPC_INST_LWA:
-                    println("\tctx.r{}.s64 = int32_t(PPC_LOAD_U32({} + ctx.r{}.u32));", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.r{}.s64 = int32_t(PPC_LOAD_U32(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}));", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LWARX:
                     break;
 
                 case PPC_INST_LWAX:
-                    println("\tctx.r{}.s64 = int32_t(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.s64 = int32_t(PPC_LOAD_U32(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32));", insn.operands[2]);
                     break;
 
                 case PPC_INST_LWBRX:
-                    println("\tctx.r{}.u64 = _byteswap_ulong(PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.u64 = _byteswap_ulong(PPC_LOAD_U32(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32));", insn.operands[2]);
                     break;
 
                 case PPC_INST_LWSYNC:
@@ -654,7 +726,10 @@ int main()
                     break;
 
                 case PPC_INST_LWZ:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U32({} + ctx.r{}.u32);", insn.operands[0], int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U32(", insn.operands[0]);
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{});", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_LWZU:
@@ -664,7 +739,10 @@ int main()
                     break;
 
                 case PPC_INST_LWZX:
-                    println("\tctx.r{}.u64 = PPC_LOAD_U32(ctx.r{}.u32 + ctx.r{}.u32);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    print("\tctx.r{}.u64 = PPC_LOAD_U32(", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
                     break;
 
                 case PPC_INST_MFCR:
@@ -707,12 +785,10 @@ int main()
                     break;
 
                 case PPC_INST_MULHW:
-                    // TODO: might be having 32 bit truncation here
                     println("\tctx.r{}.s64 = int64_t(ctx.r{}.s32 * ctx.r{}.s32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULHWU:
-                    // TODO: might be having 32 bit truncation here
                     println("\tctx.r{}.u64 = uint64_t(ctx.r{}.u32 * ctx.r{}.u32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
@@ -791,7 +867,10 @@ int main()
                     break;
 
                 case PPC_INST_STB:
-                    println("\tPPC_STORE_U8({} + ctx.r{}.u32, ctx.r{}.u8);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U8(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}, ctx.r{}.u8);", int32_t(insn.operands[1]), insn.operands[0]);
                     break;
 
                 case PPC_INST_STBU:
@@ -801,11 +880,17 @@ int main()
                     break;
 
                 case PPC_INST_STBX:
-                    println("\tPPC_STORE_U8(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u8);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U8(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, ctx.r{}.u8);", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STD:
-                    println("\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.r{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U64(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}, ctx.r{}.u64);", int32_t(insn.operands[1]), insn.operands[0]);
                     break;
 
                 case PPC_INST_STDCX:
@@ -818,41 +903,68 @@ int main()
                     break;
 
                 case PPC_INST_STDX:
-                    println("\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U64(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, ctx.r{}.u64);", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFD:
-                    println("\tPPC_STORE_U64({} + ctx.r{}.u32, ctx.f{}.u64);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U64(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}, ctx.f{}.u64);", int32_t(insn.operands[1]), insn.operands[0]);
                     break;
 
                 case PPC_INST_STFDX:
-                    println("\tPPC_STORE_U64(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U64(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, ctx.f{}.u64);", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFIWX:
-                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.f{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U32(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, ctx.f{}.u32);", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STFS:
                     println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
-                    println("\tPPC_STORE_U32({} + ctx.r{}.u32, temp.u32);", int32_t(insn.operands[1]), insn.operands[2]);
+                    print("\tPPC_STORE_U32(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 +", insn.operands[2]);
+                    println("{}, temp.u32);", int32_t(insn.operands[1]));
                     break;
 
                 case PPC_INST_STFSX:
                     println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
-                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, temp.u32);", insn.operands[1], insn.operands[2]);
+                    print("\tPPC_STORE_U32(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, temp.u32);", insn.operands[2]);
                     break;
 
                 case PPC_INST_STH:
-                    println("\tPPC_STORE_U16({} + ctx.r{}.u32, ctx.r{}.u16);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U16(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}, ctx.r{}.u16);", int32_t(insn.operands[1]), insn.operands[0]);
                     break;
 
                 case PPC_INST_STHBRX:
-                    println("\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ushort(ctx.r{}.u16));", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U16(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, _byteswap_ushort(ctx.r{}.u16));", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STHX:
-                    println("\tPPC_STORE_U16(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u16);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U16(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, ctx.r{}.u16);", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STVEHX:
@@ -867,11 +979,17 @@ int main()
                     break;
 
                 case PPC_INST_STW:
-                    println("\tPPC_STORE_U32({} + ctx.r{}.u32, ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U32(");
+                    if (insn.operands[2] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
+                    println("{}, ctx.r{}.u32);", int32_t(insn.operands[1]), insn.operands[0]);
                     break;
 
                 case PPC_INST_STWBRX:
-                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, _byteswap_ulong(ctx.r{}.u32));", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U32(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, _byteswap_ulong(ctx.r{}.u32));", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STWCX:
@@ -890,7 +1008,10 @@ int main()
                     break;
 
                 case PPC_INST_STWX:
-                    println("\tPPC_STORE_U32(ctx.r{}.u32 + ctx.r{}.u32, ctx.r{}.u32);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    print("\tPPC_STORE_U32(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32, ctx.r{}.u32);", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBF:
