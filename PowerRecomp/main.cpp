@@ -270,7 +270,7 @@ int main()
 
                 case PPC_INST_BDNZF:
                     // NOTE: assuming eq here as a shortcut because all the instructions in the game do that
-                    println("\tif (--ctx.ctr != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0], insn.operands[2]);
+                    println("\tif (--ctx.ctr != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0] / 4, insn.operands[1]);
                     break;
 
                 case PPC_INST_BEQ:

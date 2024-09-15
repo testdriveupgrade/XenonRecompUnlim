@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 
 #ifdef __clang__
