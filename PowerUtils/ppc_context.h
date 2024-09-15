@@ -338,3 +338,8 @@ struct PPCContext
         PPCVRegister v[128];
     };
 };
+
+inline __m128i _mm_adds_epu32(__m128i a, __m128i b) 
+{
+    return _mm_add_epi32(_mm_min_epu32(a, _mm_xor_si128(b, _mm_cmpeq_epi32(b, b))), b);
+}
