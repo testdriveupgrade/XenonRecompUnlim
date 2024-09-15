@@ -10,6 +10,14 @@
 
 #define TEST_FILE "default.xex"
 
+static uint64_t computeMask(uint32_t mstart, uint32_t mstop)
+{
+    mstart &= 0x3F;
+    mstop &= 0x3F;
+    uint64_t value = (UINT64_MAX >> mstart) ^ ((mstop >= 63) ? 0 : UINT64_MAX >> (mstop + 1));
+    return mstart <= mstop ? value : ~value;
+}
+
 int main()
 {
     const auto file = LoadFile(TEST_FILE).value();
@@ -809,8 +817,6 @@ int main()
 
                 case PPC_INST_MTMSRD:
                 case PPC_INST_MTXER:
-                case PPC_INST_MULCHWU:
-                case PPC_INST_MULHHW:
                     break;
 
                 case PPC_INST_MULHW:
@@ -878,13 +884,45 @@ int main()
                     break;
 
                 case PPC_INST_RLDICL:
+                    println("\tctx.r{}.u64 = _rotl64(ctx.r{}.u64, {}) & 0x{:X};", insn.operands[0], insn.operands[1], insn.operands[2], computeMask(insn.operands[3], 63));
+                    break;
+
                 case PPC_INST_RLDICR:
+                    println("\tctx.r{}.u64 = _rotl64(ctx.r{}.u64, {}) & 0x{:X};", insn.operands[0], insn.operands[1], insn.operands[2], computeMask(0, insn.operands[3]));
+                    break;
+
                 case PPC_INST_RLDIMI:
+                {
+                    const uint64_t mask = computeMask(insn.operands[3], ~insn.operands[1]);
+                    println("\tctx.r{}.u64 = (_rotl64(ctx.r{}.u64, {}) & 0x{:X}) | (ctx.r{}.u64 & 0x{:X});", insn.operands[0], insn.operands[1], insn.operands[2], mask, insn.operands[0], ~mask);
+                    break;
+                }
+
                 case PPC_INST_RLWIMI:
+                {
+                    const uint64_t mask = computeMask(insn.operands[3] + 32, insn.operands[4] + 32);
+                    println("\tctx.r{}.u64 = (_rotl(ctx.r{}.u32, {}) & 0x{:X}) | (ctx.r{}.u64 & 0x{:X});", insn.operands[0], insn.operands[1], insn.operands[2], mask, insn.operands[0], ~mask);
+                    break;
+                }
+
                 case PPC_INST_RLWINM:
+                    println("\tctx.r{}.u64 = _rotl(ctx.r{}.u32, {}) & 0x{:X};", insn.operands[0], insn.operands[1], insn.operands[2], computeMask(insn.operands[3] + 32, insn.operands[4] + 32));
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_ROTLDI:
+                    println("\tctx.r{}.u64 = _rotl64(ctx.r{}.u64, {});", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ROTLW:
+                    println("\tctx.r{}.u64 = _rotl(ctx.r{}.u32, ctx.r{}.u8 & 0x1F);", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_ROTLWI:
+                    println("\tctx.r{}.u64 = _rotl(ctx.r{}.u32, {});", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_SLD:
