@@ -413,8 +413,21 @@ int main()
                     break;
 
                 case PPC_INST_DCBTST:
+                    // no op
+                    break;
+
                 case PPC_INST_DCBZ:
+                    print("\tmemset(base + ((");
+                    if (insn.operands[0] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[0]);
+                    println("ctx.r{}.u32) & ~31), 0, 32);", insn.operands[1]);
+                    break;
+
                 case PPC_INST_DCBZL:
+                    print("\tmemset(base + ((");
+                    if (insn.operands[0] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[0]);
+                    println("ctx.r{}.u32) & ~127), 0, 128);", insn.operands[1]);
                     break;
 
                 case PPC_INST_DIVD:
@@ -604,6 +617,11 @@ int main()
                     break;
 
                 case PPC_INST_LDARX:
+                    print("\tctx.reserved.u64 = PPC_LOAD_U64(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.reserved.u64;", insn.operands[0]);
                     break;
 
                 case PPC_INST_LDU:
@@ -705,6 +723,11 @@ int main()
                     break;
 
                 case PPC_INST_LWARX:
+                    print("\tctx.reserved.u32 = PPC_LOAD_U32(");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32);", insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.reserved.u32;", insn.operands[0]);
                     break;
 
                 case PPC_INST_LWAX:
@@ -856,14 +879,32 @@ int main()
                 case PPC_INST_ROTLDI:
                 case PPC_INST_ROTLW:
                 case PPC_INST_ROTLWI:
+                    break;
+
                 case PPC_INST_SLD:
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x40 ? 0 : ctx.r{}.u64 << (ctx.r{}.u8 & 0x7F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_SLW:
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : ctx.r{}.u32 << (ctx.r{}.u8 & 0x3F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_SRAD:
                 case PPC_INST_SRADI:
                 case PPC_INST_SRAW:
                 case PPC_INST_SRAWI:
+                    break;
+
                 case PPC_INST_SRD:
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x40 ? 0 : ctx.r{}.u64 >> (ctx.r{}.u8 & 0x7F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_SRW:
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : ctx.r{}.u32 >> (ctx.r{}.u8 & 0x3F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_STB:
@@ -894,6 +935,14 @@ int main()
                     break;
 
                 case PPC_INST_STDCX:
+                    println("\tctx.cr0.lt = 0;");
+                    println("\tctx.cr0.gt = 0;");
+                    print("\tctx.cr0.eq = _InterlockedCompareExchange64(reinterpret_cast<__int64*>(base + ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32), _byteswap_uint64(ctx.r{}.s64), _byteswap_uint64(ctx.reserved.s64)) == _byteswap_uint64(ctx.reserved.s64);",
+                        insn.operands[2], insn.operands[0]);
+                    println("\tctx.cr0.so = ctx.xer.so;");
                     break;
 
                 case PPC_INST_STDU:
@@ -993,6 +1042,14 @@ int main()
                     break;
 
                 case PPC_INST_STWCX:
+                    println("\tctx.cr0.lt = 0;");
+                    println("\tctx.cr0.gt = 0;");
+                    print("\tctx.cr0.eq = _InterlockedCompareExchange(reinterpret_cast<long*>(base + ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32), _byteswap_ulong(ctx.r{}.s32), _byteswap_ulong(ctx.reserved.s32)) == _byteswap_ulong(ctx.reserved.s32);",
+                        insn.operands[2], insn.operands[0]);
+                    println("\tctx.cr0.so = ctx.xer.so;");
                     break;
 
                 case PPC_INST_STWU:
@@ -1035,11 +1092,29 @@ int main()
                     break;
 
                 case PPC_INST_SYNC:
+                    // no op?
+                    break;
+
                 case PPC_INST_TDLGEI:
+                    // no op
+                    break;
+
                 case PPC_INST_TDLLEI:
+                    // no op
+                    break;
+
                 case PPC_INST_TWI:
+                    // no op
+                    break;
+
                 case PPC_INST_TWLGEI:
+                    // no op
+                    break;
+
                 case PPC_INST_TWLLEI:
+                    // no op
+                    break;
+
                 case PPC_INST_VADDFP:
                 case PPC_INST_VADDFP128:
                 case PPC_INST_VADDSHS:

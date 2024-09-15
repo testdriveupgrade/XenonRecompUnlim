@@ -104,6 +104,7 @@ struct PPCContext
     uint64_t lr;
     uint64_t ctr;
     PPCXERRegister xer;
+    PPCRegister reserved;
 
     union
     {
