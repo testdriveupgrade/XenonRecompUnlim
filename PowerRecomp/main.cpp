@@ -43,7 +43,6 @@ int main()
         image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
     }
 
-    std::vector<Function> missingFunctions;
     for (const auto& section : image.sections)
     {
         if (!(section.flags & SectionFlags_Code))
@@ -81,7 +80,7 @@ int main()
             }
             else
             {
-                auto& missingFn = missingFunctions.emplace_back(Function::Analyze(data, dataEnd - data, base));
+                auto& missingFn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
                 image.symbols.emplace(std::format("sub_{:X}", missingFn.base), missingFn.base, missingFn.size, Symbol_Function);
 
                 base += missingFn.size;
@@ -705,14 +704,21 @@ int main()
 
                 case PPC_INST_LVEWX:
                 case PPC_INST_LVEWX128:
+                case PPC_INST_LVX:
+                case PPC_INST_LVX128:
+                    // TODO: endian swap
+                    print("\t_mm_store_ps(ctx.v{}.f32, _mm_load_ps(reinterpret_cast<float*>(base + ", insn.operands[0]);
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32)));", insn.operands[2]);
+                    break;
+
                 case PPC_INST_LVLX:
                 case PPC_INST_LVLX128:
                 case PPC_INST_LVRX:
                 case PPC_INST_LVRX128:
                 case PPC_INST_LVSL:
                 case PPC_INST_LVSR:
-                case PPC_INST_LVX:
-                case PPC_INST_LVX128:
                     break;
 
                 case PPC_INST_LWA:
@@ -1117,15 +1123,26 @@ int main()
 
                 case PPC_INST_VADDFP:
                 case PPC_INST_VADDFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_add_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VADDSHS:
                 case PPC_INST_VADDUBM:
                 case PPC_INST_VADDUBS:
                 case PPC_INST_VADDUHM:
                 case PPC_INST_VADDUWM:
                 case PPC_INST_VADDUWS:
+                    break;
+
                 case PPC_INST_VAND:
                 case PPC_INST_VAND128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_and_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VANDC128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_andnot_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VAVGSB:
                 case PPC_INST_VAVGSH:
                 case PPC_INST_VAVGUB:
@@ -1147,16 +1164,42 @@ int main()
                 case PPC_INST_VCSXWFP128:
                 case PPC_INST_VCTSXS:
                 case PPC_INST_VCUXWFP128:
+                    break;
+
                 case PPC_INST_VEXPTEFP128:
+                    // TODO: this doesn't exist despite being documented?
+                    //println("\t_mm_store_ps(ctx.v{}.f32, _mm_exp2_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VLOGEFP128:
+                    // TODO: this doesn't exist despite being documented?
+                    //println("\t_mm_store_ps(ctx.v{}.f32, _mm_log2_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VMADDCFP128:
+                    // TODO: wrong argument order
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_fmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_VMADDFP:
                 case PPC_INST_VMADDFP128:
+                    // TODO: wrong argument order
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_fmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_VMAXFP:
                 case PPC_INST_VMAXFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_max_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VMAXSW:
+                    break;
+
                 case PPC_INST_VMINFP:
                 case PPC_INST_VMINFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_min_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VMRGHB:
                 case PPC_INST_VMRGHH:
                 case PPC_INST_VMRGHW:
@@ -1165,27 +1208,55 @@ int main()
                 case PPC_INST_VMRGLH:
                 case PPC_INST_VMRGLW:
                 case PPC_INST_VMRGLW128:
+                    break;
+
                 case PPC_INST_VMSUM3FP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_dp_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), 0xEF));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VMSUM4FP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_dp_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), 0xFF));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VMULFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VNMSUBFP:
                 case PPC_INST_VNMSUBFP128:
+                    // TODO: wrong argument order
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_fnmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_VOR:
                 case PPC_INST_VOR128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_or_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VPERM:
                 case PPC_INST_VPERM128:
                 case PPC_INST_VPERMWI128:
                 case PPC_INST_VPKD3D128:
                 case PPC_INST_VPKSHUS:
+                    break;
+
                 case PPC_INST_VREFP:
                 case PPC_INST_VREFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_rcp_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VRFIM128:
                 case PPC_INST_VRFIN:
                 case PPC_INST_VRFIN128:
                 case PPC_INST_VRFIZ128:
                 case PPC_INST_VRLIMI128:
+                    break;
+
                 case PPC_INST_VRSQRTEFP:
                 case PPC_INST_VRSQRTEFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_rsqrt_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VSEL:
                 case PPC_INST_VSLB:
                 case PPC_INST_VSLDOI:
@@ -1201,8 +1272,13 @@ int main()
                 case PPC_INST_VSRAW128:
                 case PPC_INST_VSRW:
                 case PPC_INST_VSRW128:
+                    break;
+
                 case PPC_INST_VSUBFP:
                 case PPC_INST_VSUBFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_sub_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VSUBSWS:
                 case PPC_INST_VSUBUBS:
                 case PPC_INST_VSUBUHM:
@@ -1211,8 +1287,11 @@ int main()
                 case PPC_INST_VUPKHSH:
                 case PPC_INST_VUPKLSB128:
                 case PPC_INST_VUPKLSH:
+                    break;
+
                 case PPC_INST_VXOR:
                 case PPC_INST_VXOR128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_xor_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_XOR:
