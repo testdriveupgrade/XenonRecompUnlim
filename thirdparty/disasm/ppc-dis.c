@@ -1825,10 +1825,10 @@ extract_vperm (unsigned long insn,
 #define VXR_MASK VXR(0x3f, 0x3ff, 1)
 
 /* An VX128 form instruction. */
-#define VX128(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x3d0))
+#define VX128(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x7d0))
 
 /* The mask for an VX form instruction. */
-#define VX128_MASK	VX(0x3f, 0x3d0)
+#define VX128_MASK	VX(0x3f, 0x7d0)
 
 /* An VX128 form instruction. */
 #define VX128_1(op, xop) (OP(op) | (((unsigned long)(xop)) & 0x7f3))
@@ -2543,6 +2543,8 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 { "vmrglw128", VX128(6, 832), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 }, PPC_INST_VMRGLW128 },
 { "vupkhsb128", VX128(6, 896), VX128_MASK, PPCVEC128, { VD128, VB128 }, PPC_INST_VUPKHSB128 },
 { "vupklsb128", VX128(6, 960), VX128_MASK, PPCVEC128, { VD128, VB128 }, PPC_INST_VUPKLSB128 },
+{ "vupkhsh128", VX128(6, 1952), VX128_MASK, PPCVEC128, { VD128, VB128 }, PPC_INST_VUPKHSH128 },
+{ "vupklsh128", VX128(6, 2016), VX128_MASK, PPCVEC128, { VD128, VB128 }, PPC_INST_VUPKLSH128 },
 
 
 { "evaddw",    VX(4, 512), VX_MASK,	PPCSPE,		{ RS, RA, RB }, PPC_INST_EVADDW },

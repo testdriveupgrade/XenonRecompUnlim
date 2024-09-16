@@ -346,3 +346,24 @@ inline __m128i _mm_adds_epu32(__m128i a, __m128i b)
 {
     return _mm_add_epi32(_mm_min_epu32(a, _mm_xor_si128(b, _mm_cmpeq_epi32(b, b))), b);
 }
+
+inline __m128i _mm_avg_epi8(__m128i a, __m128i b)
+{
+    __m128i c = _mm_set1_epi8(char(128));
+    return _mm_add_epi8(c, _mm_avg_epu8(_mm_add_epi8(c, a), _mm_add_epi8(c, b)));
+}
+
+inline __m128i _mm_avg_epi16(__m128i a, __m128i b)
+{
+    __m128i c = _mm_set1_epi16(short(32768));
+    return _mm_add_epi16(c, _mm_avg_epu16(_mm_add_epi16(c, a), _mm_add_epi16(c, b)));
+}
+
+inline __m128 _mm_cvtepu32_ps(__m128i v)
+{
+    __m128i v2 = _mm_srli_epi32(v, 1);
+    __m128i v1 = _mm_sub_epi32(v, v2);
+    __m128 v2f = _mm_cvtepi32_ps(v2);
+    __m128 v1f = _mm_cvtepi32_ps(v1);
+    return _mm_add_ps(v2f, v1f);
+}

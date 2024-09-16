@@ -1246,11 +1246,11 @@ int main()
                     break;
 
                 case PPC_INST_VAVGSB:
-                    // TODO: no _mm_avg_epi8
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_avg_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_VAVGSH:
-                    // TODO: no _mm_avg_epi16
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_avg_epi16(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_VAVGUB:
@@ -1266,6 +1266,8 @@ int main()
                     break;
 
                 case PPC_INST_VCFUX:
+                    // NOTE: ignoring the immediate since it's always 0 in the game code
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_cvtepu32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_VCMPBFP128:
@@ -1279,10 +1281,20 @@ int main()
                 case PPC_INST_VCMPEQUB:
                 case PPC_INST_VCMPEQUW:
                 case PPC_INST_VCMPEQUW128:
+                    break;
+
                 case PPC_INST_VCMPGEFP:
                 case PPC_INST_VCMPGEFP128:
+                    // TODO: . variant
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpge_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VCMPGTFP:
                 case PPC_INST_VCMPGTFP128:
+                    // TODO: . variant
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpgt_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VCMPGTUB:
                 case PPC_INST_VCMPGTUH:
                 case PPC_INST_VCSXWFP128:
@@ -1291,13 +1303,15 @@ int main()
                     break;
 
                 case PPC_INST_VEXPTEFP128:
-                    // TODO: this doesn't exist despite being documented?
-                    //println("\t_mm_store_ps(ctx.v{}.f32, _mm_exp2_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
+                    // TODO: vectorize
+                    for (size_t i = 0; i < 4; i++)
+                        println("\tctx.v{}.f32[{}] = exp2f(ctx.v{}.f32[{}]);", insn.operands[0], i, insn.operands[1], i);
                     break;
 
                 case PPC_INST_VLOGEFP128:
-                    // TODO: this doesn't exist despite being documented?
-                    //println("\t_mm_store_ps(ctx.v{}.f32, _mm_log2_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
+                    // TODO: vectorize
+                    for (size_t i = 0; i < 4; i++)
+                        println("\tctx.v{}.f32[{}] = log2f(ctx.v{}.f32[{}]);", insn.operands[0], i, insn.operands[1], i);
                     break;
 
                 case PPC_INST_VMADDCFP128:
@@ -1415,8 +1429,13 @@ int main()
                     break;
 
                 case PPC_INST_VSLB:
+                    break;
+
                 case PPC_INST_VSLDOI:
                 case PPC_INST_VSLDOI128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_alignr_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8), {}));", insn.operands[0], insn.operands[1], insn.operands[2], 16 - insn.operands[3]);
+                    break;
+
                 case PPC_INST_VSLW128:
                 case PPC_INST_VSPLTH:
                 case PPC_INST_VSPLTISB:
@@ -1436,13 +1455,35 @@ int main()
                     break;
 
                 case PPC_INST_VSUBSWS:
+                    break;
+
                 case PPC_INST_VSUBUBS:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_subs_epu8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VSUBUHM:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_sub_epi16(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VUPKD3D128:
+                    break;
+
                 case PPC_INST_VUPKHSB128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s16, _mm_cvtepi8_epi16(_mm_unpackhi_epi64(_mm_load_si128((__m128i*)ctx.v{}.s8), _mm_load_si128((__m128i*)ctx.v{}.s8))));", insn.operands[0], insn.operands[1], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VUPKHSH:
+                case PPC_INST_VUPKHSH128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_cvtepi16_epi32(_mm_unpackhi_epi64(_mm_load_si128((__m128i*)ctx.v{}.s16), _mm_load_si128((__m128i*)ctx.v{}.s16))));", insn.operands[0], insn.operands[1], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VUPKLSB128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_cvtepi8_epi16(_mm_load_si128((__m128i*)ctx.v{}.s16)));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VUPKLSH:
+                case PPC_INST_VUPKLSH128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_cvtepi16_epi32(_mm_load_si128((__m128i*)ctx.v{}.s16)));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_VXOR:
