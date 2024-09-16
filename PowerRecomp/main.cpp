@@ -138,6 +138,7 @@ int main()
             println("PPC_FUNC void sub_{:X}(PPCContext& __restrict ctx, uint8_t* base) {{", fn.base);
         }
 
+        println("\t__assume((reinterpret_cast<size_t>(base) & 0xFFFFFFFF) == 0);");
         println("\tPPCRegister temp;");
         println("\tuint32_t ea;\n");
 
@@ -714,19 +715,46 @@ int main()
                 case PPC_INST_LVEWX128:
                 case PPC_INST_LVX:
                 case PPC_INST_LVX128:
-                    // TODO: endian swap
-                    print("\t_mm_store_ps(ctx.v{}.f32, _mm_load_ps(reinterpret_cast<float*>(base + ", insn.operands[0]);
+                    // NOTE: for endian swapping, we reverse the whole vector instead of individual elements.
+                    // this is accounted for in every instruction (eg. dp3 sums yzw instead of xyz)
+                    print("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_shuffle_epi8(_mm_load_si128((__m128i*)(base + ((", insn.operands[0]);
                     if (insn.operands[1] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[1]);
-                    println("ctx.r{}.u32)));", insn.operands[2]);
+                    println("ctx.r{}.u32) & ~0xF))), _mm_load_si128((__m128i*)VectorMaskL)));", insn.operands[2]);
                     break;
 
                 case PPC_INST_LVLX:
                 case PPC_INST_LVLX128:
+                    print("\ttemp.u32 = ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32;", insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_shuffle_epi8(_mm_load_si128((__m128i*)(base + (temp.u32 & ~0xF))), _mm_load_si128((__m128i*)&VectorMaskL[(temp.u32 & 0xF) * 16])));", insn.operands[0]);
+                    break;
+
                 case PPC_INST_LVRX:
                 case PPC_INST_LVRX128:
+                    print("\ttemp.u32 = ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32;", insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, temp.u32 & 0xF ? _mm_shuffle_epi8(_mm_load_si128((__m128i*)(base + (temp.u32 & ~0xF))), _mm_load_si128((__m128i*)&VectorMaskR[(temp.u32 & 0xF) * 16])) : _mm_setzero_si128());", insn.operands[0]);
+                    break;
+
                 case PPC_INST_LVSL:
+                    print("\ttemp.u32 = ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32;", insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_load_si128((__m128i*)&VectorShiftTableL[(temp.u32 & 0xF) * 16]));", insn.operands[0]);
+                    break;
+
                 case PPC_INST_LVSR:
+                    print("\ttemp.u32 = ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32;", insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_load_si128((__m128i*)&VectorShiftTableR[(temp.u32 & 0xF) * 16]));", insn.operands[0]);
                     break;
 
                 case PPC_INST_LWA:
@@ -1115,8 +1143,14 @@ int main()
                 case PPC_INST_STVLX128:
                 case PPC_INST_STVRX:
                 case PPC_INST_STVRX128:
+                    break;
+
                 case PPC_INST_STVX:
                 case PPC_INST_STVX128:
+                    print("\t_mm_store_si128((__m128i*)(base + ((");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32) & ~0xF)), _mm_shuffle_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)VectorMaskL)));", insn.operands[2], insn.operands[0]);
                     break;
 
                 case PPC_INST_STW:
