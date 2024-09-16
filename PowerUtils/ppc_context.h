@@ -106,6 +106,8 @@ struct PPCContext
     uint64_t ctr;
     PPCXERRegister xer;
     PPCRegister reserved;
+    uint32_t msr;
+    uint32_t fpscr;
 
     union
     {

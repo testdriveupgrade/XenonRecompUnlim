@@ -783,7 +783,15 @@ int main()
                     break;
 
                 case PPC_INST_MFCR:
+                    for (size_t i = 0; i < 32; i++)
+                    {
+                        constexpr std::string_view fields[] = { "lt", "gt", "eq", "so" };
+                        println("\tctx.r{}.u64 {}= ctx.cr{}.{} ? 0x{:X} : 0;", insn.operands[0], i == 0 ? "" : "|", i / 4, fields[i % 4], 1u << (31 - i));
+                    }
+                    break;
+
                 case PPC_INST_MFFS:
+                    println("\tctx.f{}.u64 = ctx.fpscr;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MFLR:
@@ -791,8 +799,16 @@ int main()
                     break;
 
                 case PPC_INST_MFMSR:
+                    println("\tctx.r{}.u64 = ctx.msr;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_MFOCRF:
+                    println("\tctx.r{}.u64 = (ctx.cr{}.lt << 7) | (ctx.cr{}.gt << 6) | (ctx.cr{}.eq << 5) | (ctx.cr{}.so << 4);",
+                        insn.operands[0], insn.operands[1], insn.operands[1], insn.operands[1], insn.operands[1]);
+                    break;
+
                 case PPC_INST_MFTB:
+                    println("\tctx.r{}.u64 = __rdtsc();", insn.operands[0]);
                     break;
 
                 case PPC_INST_MR:
@@ -802,6 +818,11 @@ int main()
                     break;
 
                 case PPC_INST_MTCR:
+                    for (size_t i = 0; i < 32; i++)
+                    {
+                        constexpr std::string_view fields[] = { "lt", "gt", "eq", "so" };
+                        println("\tctx.cr{}.{} = (ctx.r{}.u32 & 0x{:X}) != 0;", i / 4, fields[i % 4], insn.operands[0], 1u << (31 - i));
+                    }
                     break;
 
                 case PPC_INST_MTCTR:
@@ -809,6 +830,7 @@ int main()
                     break;
 
                 case PPC_INST_MTFSF:
+                    println("\tctx.fpscr = ctx.f{}.u32;", insn.operands[1]);
                     break;
 
                 case PPC_INST_MTLR:
@@ -816,7 +838,13 @@ int main()
                     break;
 
                 case PPC_INST_MTMSRD:
+                    println("\tctx.msr = (ctx.r{}.u32 & 0x8020) | (ctx.msr & ~0x8020);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_MTXER:
+                    println("\tctx.xer.so = (ctx.r{}.u64 & 0x80000000) != 0;", insn.operands[0]);
+                    println("\tctx.xer.ov = (ctx.r{}.u64 & 0x40000000) != 0;", insn.operands[0]);
+                    println("\tctx.xer.ca = (ctx.r{}.u64 & 0x20000000) != 0;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MULHW:
@@ -936,9 +964,29 @@ int main()
                     break;
 
                 case PPC_INST_SRAD:
+                    println("\ttemp.u64 = ctx.r{}.u64 & 0x7F;", insn.operands[2]);
+                    println("\tif (temp.u64 > 0x3F) temp.u64 = 0x3F;");
+                    println("\tctx.xer.ca = (ctx.r{}.s64 < 0) & (((ctx.r{}.s64 >> temp.u64) << temp.u64) != ctx.r{}.s64);", insn.operands[1], insn.operands[1], insn.operands[1]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_SRADI:
+                    println("\tctx.xer.ca = (ctx.r{}.s64 < 0) & ((ctx.r{}.u64 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], computeMask(64 - insn.operands[2], 63));
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_SRAW:
+                    println("\ttemp.u32 = ctx.r{}.u32 & 0x3F;", insn.operands[2]);
+                    println("\tif (temp.u32 > 0x1F) temp.u32 = 0x1F;");
+                    println("\tctx.xer.ca = (ctx.r{}.s32 < 0) & (((ctx.r{}.s32 >> temp.u32) << temp.u32) != ctx.r{}.s32);", insn.operands[1], insn.operands[1], insn.operands[1]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s32 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_SRAWI:
+                    println("\tctx.xer.ca = (ctx.r{}.s32 < 0) & ((ctx.r{}.u32 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], computeMask(64 - insn.operands[2], 63));
+                    println("\tctx.r{}.s64 = ctx.r{}.s32 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_SRD:
