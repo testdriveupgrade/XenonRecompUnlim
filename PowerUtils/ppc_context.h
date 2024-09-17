@@ -81,6 +81,24 @@ struct PPCCRRegister
         eq = left == right;
         un = isnan(left) || isnan(right);
     }
+
+    void setFromMask(__m128 mask, int imm)
+    {
+        int m = _mm_movemask_ps(mask);
+        lt = m == imm; // all equal
+        gt = 0;
+        eq = m == 0; // none equal
+        so = 0;
+    }
+
+    void setFromMask(__m128i mask, int imm)
+    {
+        int m = _mm_movemask_epi8(mask);
+        lt = m == imm; // all equal
+        gt = 0;
+        eq = m == 0; // none equal
+        so = 0;
+    }
 };
 
 struct alignas(0x10) PPCVRegister
@@ -455,3 +473,16 @@ inline __m128i _mm_perm_epi8(__m128i a, __m128i b, __m128i c)
     __m128i e = _mm_sub_epi8(d, _mm_and_si128(c, d));
     return _mm_blendv_epi8(_mm_shuffle_epi8(a, e), _mm_shuffle_epi8(b, e), _mm_slli_epi32(c, 3));
 }
+
+inline __m128i _mm_cmpgt_epu8(__m128i a, __m128i b)
+{
+    __m128i c = _mm_set1_epi8(0x80);
+    return _mm_cmpgt_epi8(_mm_xor_si128(a, c), _mm_xor_si128(b, c));
+}
+
+inline __m128i _mm_cmpgt_epu16(__m128i a, __m128i b)
+{
+    __m128i c = _mm_set1_epi16(0x8000);
+    return _mm_cmpgt_epi16(_mm_xor_si128(a, c), _mm_xor_si128(b, c));
+}
+

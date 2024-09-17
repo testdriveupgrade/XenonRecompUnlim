@@ -1241,6 +1241,7 @@ int main()
                     // no op
                     break;
 
+                    // TODO: vector instructions require denormal flushing checks
                 case PPC_INST_VADDFP:
                 case PPC_INST_VADDFP128:
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_add_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
@@ -1291,17 +1292,20 @@ int main()
                     println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_avg_epu8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
+                case PPC_INST_VCTSXS:
                 case PPC_INST_VCFPSXWS128:
+                    // TODO: saturate
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_cvttps_epi32(_mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_set1_ps(exp2f({})))));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_VCFSX:
-                    // NOTE: ignoring the immediate since it's always 0 in the game code
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1]);
+                case PPC_INST_VCSXWFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_set1_ps(ldexpf(1.0f, {}))));", insn.operands[0], insn.operands[1], -int32_t(insn.operands[2]));
                     break;
 
                 case PPC_INST_VCFUX:
-                    // NOTE: ignoring the immediate since it's always 0 in the game code
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_cvtepu32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1]);
+                case PPC_INST_VCUXWFP128:
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_set1_ps(ldexpf(1.0f, {}))));", insn.operands[0], insn.operands[1], -int32_t(insn.operands[2]));
                     break;
 
                 case PPC_INST_VCMPBFP128:
@@ -1313,27 +1317,38 @@ int main()
                     break;
 
                 case PPC_INST_VCMPEQUB:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpeq_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->opcode & 0x1)
+                        println("\tctx.cr6.setFromMask(_mm_load_si128((__m128i*)ctx.v{}.u8), 0xFFFF);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_VCMPEQUW:
                 case PPC_INST_VCMPEQUW128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpeq_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), _mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if ((insn.opcode->id == PPC_INST_VCMPEQUW && (insn.opcode->opcode & 0x1)) || (insn.opcode->id == PPC_INST_VCMPEQUW128 && (insn.opcode->opcode & 0x40)))
+                        println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
                     break;
 
                 case PPC_INST_VCMPGEFP:
                 case PPC_INST_VCMPGEFP128:
-                    // TODO: . variant
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpge_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->id == PPC_INST_VCMPGEFP128 && (insn.opcode->opcode & 0x40))
+                        println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
                     break;
 
                 case PPC_INST_VCMPGTFP:
                 case PPC_INST_VCMPGTFP128:
-                    // TODO: . variant
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpgt_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    if (insn.opcode->id == PPC_INST_VCMPGTFP128 && (insn.opcode->opcode & 0x40))
+                        println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
                     break;
 
                 case PPC_INST_VCMPGTUB:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpgt_epu8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VCMPGTUH:
-                case PPC_INST_VCSXWFP128:
-                case PPC_INST_VCTSXS:
-                case PPC_INST_VCUXWFP128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpgt_epu16(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_load_si128((__m128i*)ctx.v{}.u16)));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_VEXPTEFP128:
