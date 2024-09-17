@@ -1400,6 +1400,7 @@ int main()
                     break;
 
                 case PPC_INST_VMSUM3FP128:
+                    // NOTE: accounting for full vector reversal here. should dot product yzw instead of xyz
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_dp_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), 0xEF));", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
@@ -1424,7 +1425,21 @@ int main()
 
                 case PPC_INST_VPERM:
                 case PPC_INST_VPERM128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_perm_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    break;
+
                 case PPC_INST_VPERMWI128:
+                {
+                    // NOTE: accounting for full vector reversal here
+                    uint32_t x = 3 - (insn.operands[2] & 0x3);
+                    uint32_t y = 3 - ((insn.operands[2] >> 2) & 0x3);
+                    uint32_t z = 3 - ((insn.operands[2] >> 4) & 0x3);
+                    uint32_t w = 3 - ((insn.operands[2] >> 6) & 0x3);
+                    uint32_t perm = x | (y << 2) | (z << 4) | (w << 6);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_shuffle_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), 0x{:X}));", insn.operands[0], insn.operands[1], perm);
+                    break;
+                }
+
                 case PPC_INST_VPKD3D128:
                     break;
 
@@ -1463,6 +1478,9 @@ int main()
                     break;
 
                 case PPC_INST_VSLB:
+                    // TODO: vectorize
+                    for (size_t i = 0; i < 16; i++)
+                        println("\tctx.v{}.u8[{}] = ctx.v{}.u8[{}] << (ctx.v{}.u8[{}] & 0x7);", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i);
                     break;
 
                 case PPC_INST_VSLDOI:
@@ -1471,16 +1489,56 @@ int main()
                     break;
 
                 case PPC_INST_VSLW128:
+                    // TODO: vectorize, ensure endianness is correct
+                    for (size_t i = 0; i < 4; i++)
+                        println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] << ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
+                    break;
+
                 case PPC_INST_VSPLTH:
+                {
+                    // NOTE: accounting for full vector reversal here
+                    uint32_t perm = 7 - insn.operands[2];
+                    perm = (perm * 2) | ((perm * 2 + 1) << 8);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u16, _mm_shuffle_epi8(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_set1_epi16(0x{:X})));", insn.operands[0], insn.operands[1], perm);
+                    break;
+                }
+
                 case PPC_INST_VSPLTISB:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_set1_epi8(0x{:X}));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VSPLTISW:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_set1_epi32(0x{:X}));", insn.operands[0], insn.operands[1]);
+                    break;
+
                 case PPC_INST_VSPLTISW128:
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_set1_epi32(0x{:X}));", insn.operands[0], insn.operands[2]);
+                    break;
+
                 case PPC_INST_VSPLTW:
                 case PPC_INST_VSPLTW128:
+                {
+                    // NOTE: accounting for full vector reversal here
+                    uint32_t perm = 3 - insn.operands[2];
+                    perm |= (perm << 2) | (perm << 4) | (perm << 6);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_shuffle_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), 0x{:X}));", insn.operands[0], insn.operands[1], perm);
+                    break;
+                }
+
                 case PPC_INST_VSR:
+                    break;
+
                 case PPC_INST_VSRAW128:
+                    // TODO: vectorize, ensure endianness is correct
+                    for (size_t i = 0; i < 4; i++)
+                        println("\tctx.v{}.s32[{}] = ctx.v{}.s32[{}] >> ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
+                    break;
+
                 case PPC_INST_VSRW:
                 case PPC_INST_VSRW128:
+                    // TODO: vectorize, ensure endianness is correct
+                    for (size_t i = 0; i < 4; i++)
+                        println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] >> ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
                     break;
 
                 case PPC_INST_VSUBFP:

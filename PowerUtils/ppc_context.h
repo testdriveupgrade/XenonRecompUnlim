@@ -448,3 +448,10 @@ inline __m128 _mm_cvtepu32_ps(__m128i v)
     __m128 v1f = _mm_cvtepi32_ps(v1);
     return _mm_add_ps(v2f, v1f);
 }
+
+inline __m128i _mm_perm_epi8(__m128i a, __m128i b, __m128i c)
+{
+    __m128i d = _mm_set1_epi8(0xF);
+    __m128i e = _mm_sub_epi8(d, _mm_and_si128(c, d));
+    return _mm_blendv_epi8(_mm_shuffle_epi8(a, e), _mm_shuffle_epi8(b, e), _mm_slli_epi32(c, 3));
+}
