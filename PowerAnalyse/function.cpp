@@ -137,13 +137,6 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
                 if (op == PPC_OP_B)
                 {
-                    // Tail call, no need to chase
-                    if (blocks.size() == 1)
-                    {
-                        RESTORE_DATA();
-                        continue;
-                    }
-
                     assert(!PPC_BA(instruction));
                     const auto branchDest = addr + PPC_BI(instruction);
 

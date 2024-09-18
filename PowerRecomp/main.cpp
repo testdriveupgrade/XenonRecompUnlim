@@ -122,6 +122,50 @@ int main(int argc, char* argv[])
         }
     }
 
+    auto hardcodedFuncCheck = [&](Function& f)
+    {
+        if (f.base == 0x824E7EF0) f.size = 0x98;
+        else if (f.base == 0x824E7F28) f.size = 0x60;
+        else if (f.base == 0x82C980E8) f.size = 0x110;
+        else if (f.base == 0x82CF7080) f.size = 0x80;
+        else if (f.base == 0x82D9AC08) f.size = 0x78;
+        else if (f.base == 0x82E86770) f.size = 0x98;
+        else if (f.base == 0x82E97E50) f.size = 0x84;
+        else if (f.base == 0x82EE2D08) f.size = 0x154;
+        else if (f.base == 0x82EF5C38) f.size = 0x64;
+        else if (f.base == 0x82EF5D78) f.size = 0x3F8;
+        else if (f.base == 0x82F08730) f.size = 0x2B0;
+        else if (f.base == 0x82F098C0) f.size = 0x19C;
+        else if (f.base == 0x82F13980) f.size = 0xF4;
+        else if (f.base == 0x82F1D668) f.size = 0x1E8;
+        else if (f.base == 0x82F22908) f.size = 0x20C;
+        else if (f.base == 0x82F25FD8) f.size = 0x240;
+        else if (f.base == 0x82F852A0) f.size = 0xCC;
+        else if (f.base == 0x830DADA0) f.size = 0x150;
+        else if (f.base == 0x831487D0) f.size = 0xD4;
+        else if (f.base == 0x831530C8) f.size = 0x258;
+        else if (f.base == 0x831539E0) f.size = 0xD0;
+        else if (f.base == 0x83168940) f.size = 0x100;
+        else if (f.base == 0x83168A48) f.size = 0x11C;
+        else if (f.base == 0x83168B70) f.size = 0x128;
+        else if (f.base == 0x83168F18) f.size = 0x254;
+        else if (f.base == 0x8316C678) f.size = 0x78;
+        else if (f.base == 0x8317CD30) f.size = 0x50;
+        else if (f.base == 0x83180700) f.size = 0x74;
+        else if (f.base == 0x8319ED58) f.size = 0x98;
+        else if (f.base == 0x82455E70) f.size = 0x84;
+        else if (f.base == 0x82456DC8) f.size = 0xD4;
+        else if (f.base == 0x826ABB70) f.size = 0x70;
+        else if (f.base == 0x82893088) f.size = 0x45C;
+        else if (f.base == 0x82C49540) f.size = 0x114;
+        else if (f.base == 0x82DE35D8) f.size = 0x68;
+        else if (f.base == 0x82DE3640) f.size = 0x64;
+        else if (f.base == 0x82DE36A8) f.size = 0x5C;
+        else if (f.base == 0x82DE3708) f.size = 0x198;
+        else if (f.base == 0x82DE38A0) f.size = 0x16C;
+        else if (f.base == 0x830B7DD0) f.size = 0x74;
+    };
+
     for (const auto& section : image.sections)
     {
         if (!(section.flags & SectionFlags_Code))
@@ -131,7 +175,27 @@ int main(int argc, char* argv[])
         size_t base = section.base;
         uint8_t* data = section.data;
         uint8_t* dataEnd = section.data + section.size;
+
+        while (data < dataEnd)
+        {
+            uint32_t insn = std::byteswap(*(uint32_t*)data);
+            if (PPC_OP(insn) == PPC_OP_B && PPC_BL(insn))
+            {
+                size_t address = base + (data - section.data) + PPC_BI(insn);
+
+                if (image.symbols.find(address) == image.symbols.end())
+                {
+                    auto& fn = functions.emplace_back(Function::Analyze(section.data + address - section.base, section.size - (address - section.base), address));
+                    hardcodedFuncCheck(fn);
+                    image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+                }
+            }
+            data += 4;
+        }
+
+        data = section.data;
         const Symbol* prevSymbol = nullptr;
+
         while (data < dataEnd)
         {
             if (*(uint32_t*)data == 0)
@@ -159,42 +223,12 @@ int main(int argc, char* argv[])
             }
             else
             {
-                auto& missingFn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
+                auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
+                hardcodedFuncCheck(fn);
+                image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
 
-                if (base == 0x824E7EF0) missingFn.size = 0x98;
-                else if (base == 0x824E7F28) missingFn.size = 0x60;
-                else if (base == 0x82C980E8) missingFn.size = 0x110;
-                else if (base == 0x82CF7080) missingFn.size = 0x80;
-                else if (base == 0x82D9AC08) missingFn.size = 0x78;
-                else if (base == 0x82E86770) missingFn.size = 0x98;
-                else if (base == 0x82E97E50) missingFn.size = 0x84;
-                else if (base == 0x82EE2D08) missingFn.size = 0x154;
-                else if (base == 0x82EF5C38) missingFn.size = 0x64;
-                else if (base == 0x82EF5D78) missingFn.size = 0x3F8;
-                else if (base == 0x82F08730) missingFn.size = 0x2B0;
-                else if (base == 0x82F098C0) missingFn.size = 0x19C;
-                else if (base == 0x82F13980) missingFn.size = 0xF4;
-                else if (base == 0x82F1D668) missingFn.size = 0x1E8;
-                else if (base == 0x82F22908) missingFn.size = 0x20C;
-                else if (base == 0x82F25FD8) missingFn.size = 0x240;
-                else if (base == 0x82F852A0) missingFn.size = 0xCC;
-                else if (base == 0x830DADA0) missingFn.size = 0x150;
-                else if (base == 0x831487D0) missingFn.size = 0xD4;
-                else if (base == 0x831530C8) missingFn.size = 0x258;
-                else if (base == 0x831539E0) missingFn.size = 0xD0;
-                else if (base == 0x83168940) missingFn.size = 0x100;
-                else if (base == 0x83168A48) missingFn.size = 0x11C;
-                else if (base == 0x83168B70) missingFn.size = 0x128;
-                else if (base == 0x83168F18) missingFn.size = 0x254;
-                else if (base == 0x8316C678) missingFn.size = 0x78;
-                else if (base == 0x8317CD30) missingFn.size = 0x50;
-                else if (base == 0x83180700) missingFn.size = 0x74;
-                else if (base == 0x8319ED58) missingFn.size = 0x98;
-
-                image.symbols.emplace(std::format("sub_{:X}", missingFn.base), missingFn.base, missingFn.size, Symbol_Function);
-
-                base += missingFn.size;
-                data += missingFn.size;
+                base += fn.size;
+                data += fn.size;
             }
         }
     }
@@ -450,18 +484,8 @@ int main(int argc, char* argv[])
                             auto label = switchTable->second.labels[i];
                             if (label < fn.base || label >= fn.base + fn.size)
                             {
-                                auto targetSymbol = image.symbols.find(label);
-
-                                if (targetSymbol != image.symbols.end() && targetSymbol->address == label && targetSymbol->type == Symbol_Function)
-                                {
-                                    println("\t\t{}(ctx, base);", targetSymbol->name);
-                                }
-                                else
-                                {
-                                    println("\t\t// ERROR: 0x{:X}", label);
-                                    std::println("ERROR: Switch case at {:X} calling a function that has no defined symbol: {:X}", base - 4, label);
-                                }
-
+                                println("\t\t// ERROR: 0x{:X}", label);
+                                std::println("ERROR: Switch case at {:X} is trying to jump outside function: {:X}", base - 4, label);
                                 println("\t\treturn;");
                             }
                             else
