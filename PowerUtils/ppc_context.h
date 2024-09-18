@@ -12,10 +12,12 @@
 #define _byteswap_uint64 __builtin_bswap64
 #define isnan __builtin_isnan
 #define __assume __builtin_assume
+#define __unreachable() __builtin_unreachable()
 #define PPC_FUNC __attribute__((weak,noinline))
 #else
 #include <intrin.h>
 #define PPC_FUNC __declspec(noinline)
+#define __unreachable() __assume(0)
 #endif
 
 #define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))

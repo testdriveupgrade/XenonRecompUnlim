@@ -7,8 +7,10 @@
 #include <filesystem>
 #include <xbox.h>
 #include <cassert>
+#include <toml++/toml.hpp>
+#include <unordered_map>
 
-#define TEST_FILE "default.xex"
+#define TEST_FILE "private/default.xex"
 
 static uint64_t computeMask(uint32_t mstart, uint32_t mstop)
 {
@@ -22,6 +24,29 @@ int main()
 {
     const auto file = LoadFile(TEST_FILE).value();
     auto image = Image::ParseImage(file.data(), file.size()).value();
+
+    std::println("Loading switch tables...");
+
+    struct SwitchTable
+    {
+        size_t r;
+        std::vector<size_t> labels;
+    };
+
+    std::unordered_map<size_t, SwitchTable> switchTables;
+
+    toml::table toml = toml::parse_file("out/switches.toml");
+    for (auto& entry : *toml["switch"].as_array())
+    {
+        auto& table = *entry.as_table();
+
+        SwitchTable switchTable;
+        switchTable.r = *table["r"].value<size_t>();
+        for (auto& array : *table["labels"].as_array())
+            switchTable.labels.push_back(*array.value<size_t>());
+
+        switchTables.emplace(*table["base"].value<size_t>(), std::move(switchTable));
+    }
 
     std::println("Analysing functions...");
 
@@ -142,10 +167,15 @@ int main()
         println("\tPPCRegister temp;");
         println("\tuint32_t ea;\n");
 
+        auto switchTable = switchTables.end();
+
         ppc_insn insn;
         while (base < end)
         {
             println("loc_{:X}:", base);
+
+            if (switchTable == switchTables.end())
+                switchTable = switchTables.find(base);
 
             ppc::Disassemble(data, 4, base, insn);
 
@@ -264,8 +294,23 @@ int main()
                     break;
 
                 case PPC_INST_BCTR:
-                    println("\tctx.fn[ctx.ctr / 4](ctx, base);");
-                    println("\treturn;");
+                    if (switchTable != switchTables.end())
+                    {
+                        println("\tswitch (ctx.r{}.u64) {{", switchTable->second.r);
+
+                        for (size_t i = 0; i < switchTable->second.labels.size(); i++)
+                            println("\t\tcase {}: goto loc_{:X};", i, switchTable->second.labels[i]);
+
+                        println("\t\tdefault: __unreachable();");
+                        println("\t}}");
+
+                        switchTable = switchTables.end();
+                    }
+                    else
+                    {
+                        println("\tctx.fn[ctx.ctr / 4](ctx, base);");
+                        println("\treturn;");
+                    }
                     break;
 
                 case PPC_INST_BCTRL:
