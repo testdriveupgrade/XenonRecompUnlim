@@ -117,7 +117,7 @@ void ScanTable(const uint32_t* code, size_t base, SwitchTable& table)
             cr = insn.operands[0];
             if (insn.opcode->operands[1] != 0)
             {
-                table.defaultLabel = insn.operands[1] + 1;
+                table.defaultLabel = insn.operands[1];
             }
         }
         else if (cr != -1)
@@ -125,7 +125,7 @@ void ScanTable(const uint32_t* code, size_t base, SwitchTable& table)
             if (insn.opcode->id == PPC_INST_CMPLWI && insn.operands[0] == cr)
             {
                 table.r = insn.operands[1];
-                table.labels.resize(insn.operands[2]);
+                table.labels.resize(insn.operands[2] + 1);
                 table.base = base;
                 break;
             }
