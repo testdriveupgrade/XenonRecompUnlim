@@ -32,6 +32,12 @@
 
 typedef void PPCFunc(struct PPCContext& __restrict ctx, uint8_t* base);
 
+struct PPCFuncMapping
+{
+    size_t guest;
+    PPCFunc* host;
+};
+
 struct PPCRegister
 {
     union

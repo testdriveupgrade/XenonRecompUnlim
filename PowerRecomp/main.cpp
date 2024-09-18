@@ -136,17 +136,60 @@ int main()
         out += '\n';
     };
 
-    println("#include <ppc_context.h>\n");
+    std::filesystem::create_directory("out");
 
-    for (auto& symbol : image.symbols)
-        println("PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base);", symbol.name);
+    size_t cppFileIndex = 0;
 
-    println("");
+    auto saveFile = [&](std::string name = "")
+    {
+        if (!out.empty())
+        {
+            if (name.empty())
+            {
+                name = std::format("out/ppc_recomp.{}.cpp", cppFileIndex);
+                ++cppFileIndex;
+            }
+
+            FILE* f = fopen(name.c_str(), "wb");
+            fwrite(out.data(), 1, out.size(), f);
+            fclose(f);
+
+            out.clear();
+        }
+    };
+
+    {
+        println("#pragma once\n");
+        println("#include <ppc_context.h>\n");
+
+        for (auto& symbol : image.symbols)
+            println("PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base);", symbol.name);
+
+        saveFile("out/ppc_recomp_shared.h");
+    }
+
+    {
+        println("#include \"ppc_recomp_shared.h\"\n");
+
+        println("extern \"C\" __declspec(dllexport) PPCFuncMapping PPCFuncMapping[] = {{");
+        for (auto& symbol : image.symbols)
+            println("\t{{ 0x{:X}, {} }},", symbol.address, symbol.name);
+
+        println("\t{{ 0, nullptr }}");
+        println("}};");
+
+        saveFile("out/ppc_func_mapping.cpp");
+    }
 
     for (size_t funcIdx = 0; funcIdx < functions.size(); funcIdx++)
     {
         if ((funcIdx % 1000) == 0)
+        {
             std::println("Recompiling functions... {}%", static_cast<float>(funcIdx) / functions.size() * 100.0f);
+
+            saveFile();
+            println("#include \"ppc_recomp_shared.h\"\n");
+        }
 
         auto& fn = functions[funcIdx];
         auto base = fn.base;
@@ -1687,11 +1730,7 @@ int main()
         println("}}\n");
     }
 
-    std::filesystem::create_directory("out");
-
-    FILE* f = fopen("out/" TEST_FILE ".cpp", "w");
-    fwrite(out.data(), 1, out.size(), f);
-    fclose(f);
+    saveFile();
 
     return 0;
 }
