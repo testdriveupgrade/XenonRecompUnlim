@@ -28,7 +28,7 @@ int main()
     uint32_t cxxFrameHandler = std::byteswap(0x831B1C90);
     uint32_t cSpecificFrameHandler = std::byteswap(0x8324B3BC);
     image.symbols.emplace("__CxxFrameHandler", 0x831B1C90, 0x38, Symbol_Function);
-    image.symbols.emplace("__C_specific_handler", 0x82BD7780, 0x38, Symbol_Function);
+    image.symbols.emplace("__C_specific_handler", 0x8324B3BC, 0x38, Symbol_Function);
     image.symbols.emplace("__memcpy", 0x831B0ED0, 0x488, Symbol_Function);
     image.symbols.emplace("__memset", 0x831B0BA0, 0xA0, Symbol_Function);
     image.symbols.emplace("__blkmov", 0x831B1358, 0xA8, Symbol_Function);
