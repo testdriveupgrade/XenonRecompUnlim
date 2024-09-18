@@ -24,7 +24,7 @@ struct SymbolComparer
 
     bool operator()(const Symbol& lhs, size_t rhs) const
     {
-        return rhs > lhs.address + lhs.size;
+        return lhs.address < rhs;
     }
 
     bool operator()(size_t lhs, const Symbol& rhs) const
@@ -34,6 +34,6 @@ struct SymbolComparer
 
     bool operator()(const Symbol& lhs, const Symbol& rhs) const
     {
-        return (lhs.address + lhs.size) < rhs.address;
+        return lhs.address < rhs.address;
     }
 };
