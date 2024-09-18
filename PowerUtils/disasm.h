@@ -30,4 +30,6 @@ namespace ppc
     {
         return Disassemble(code, 4, base, out);
     }
+
+    static int Disassemble(const void* code, uint64_t base, ppc_insn* out, size_t nOut);
 }
