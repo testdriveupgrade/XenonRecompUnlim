@@ -183,9 +183,9 @@ int main(int argc, char* argv[])
             {
                 size_t address = base + (data - section.data) + PPC_BI(insn);
 
-                if (image.symbols.find(address) == image.symbols.end())
+                if (address >= section.base && address < section.base + section.size && image.symbols.find(address) == image.symbols.end())
                 {
-                    auto& fn = functions.emplace_back(Function::Analyze(section.data + address - section.base, section.size - (address - section.base), address));
+                    auto& fn = functions.emplace_back(Function::Analyze(section.data + address - section.base, section.base + section.size - address, address));
                     hardcodedFuncCheck(fn);
                     image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
                 }
