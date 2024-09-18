@@ -16,7 +16,14 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
     GIT_TAG        v3.4.0
 )
+FetchContent_Declare(
+    xxHash
+    GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
+    GIT_TAG        v0.8.2
+    SOURCE_SUBDIR "cmake_unofficial"
+)
 FetchContent_MakeAvailable(tomlplusplus)
+FetchContent_MakeAvailable(xxHash)
 
 add_subdirectory(${THIRDPARTY_ROOT}/disasm)
 

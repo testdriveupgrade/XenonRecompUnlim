@@ -38,6 +38,8 @@ struct PPCFuncMapping
     PPCFunc* host;
 };
 
+extern const struct PPCFuncMapping PPCFuncMapping[];
+
 struct PPCRegister
 {
     union

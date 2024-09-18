@@ -9,6 +9,7 @@
 #include <cassert>
 #include <toml++/toml.hpp>
 #include <unordered_map>
+#include <xxhash.h>
 
 static uint64_t computeMask(uint32_t mstart, uint32_t mstop)
 {
@@ -119,7 +120,7 @@ int main(int argc, char* argv[])
     }
     
     std::string out;
-    out.reserve(512 * 1024 * 1024);
+    out.reserve(10 * 1024 * 1024);
 
     auto print = [&]<class... Args>(std::format_string<Args...> fmt, Args&&... args)
     {
@@ -134,6 +135,7 @@ int main(int argc, char* argv[])
 
     std::filesystem::create_directory("out");
 
+    std::vector<uint8_t> tempData;
     size_t cppFileIndex = 0;
 
     auto saveFile = [&](std::string name = "")
@@ -146,9 +148,31 @@ int main(int argc, char* argv[])
                 ++cppFileIndex;
             }
 
-            FILE* f = fopen(name.c_str(), "wb");
-            fwrite(out.data(), 1, out.size(), f);
-            fclose(f);
+            bool shouldWrite = true;
+
+            // Check if an identical file already exists first to not trigger recompilation
+            FILE* f = fopen(name.c_str(), "rb");
+            if (f)
+            {
+                fseek(f, 0, SEEK_END);
+                long fileSize = ftell(f);
+                if (fileSize == out.size())
+                {
+                    fseek(f, 0, SEEK_SET);
+                    tempData.resize(fileSize);
+                    fread(tempData.data(), 1, fileSize, f);
+
+                    shouldWrite = XXH3_64bits(tempData.data(), tempData.size()) != XXH3_64bits(out.data(), out.size());
+                }
+                fclose(f);
+            }
+
+            if (shouldWrite)
+            {
+                f = fopen(name.c_str(), "wb");
+                fwrite(out.data(), 1, out.size(), f);
+                fclose(f);
+            }
 
             out.clear();
         }
@@ -167,7 +191,7 @@ int main(int argc, char* argv[])
     {
         println("#include \"ppc_recomp_shared.h\"\n");
 
-        println("extern \"C\" __declspec(dllexport) PPCFuncMapping PPCFuncMapping[] = {{");
+        println("const struct PPCFuncMapping PPCFuncMapping[] = {{");
         for (auto& symbol : image.symbols)
             println("\t{{ 0x{:X}, {} }},", symbol.address, symbol.name);
 
@@ -181,11 +205,12 @@ int main(int argc, char* argv[])
     {
         if ((funcIdx % 100) == 0)
         {
-            std::println("Recompiling functions... {}%", static_cast<float>(funcIdx) / functions.size() * 100.0f);
-
             saveFile();
             println("#include \"ppc_recomp_shared.h\"\n");
         }
+
+        if ((funcIdx % 2000) == 0 || (funcIdx == (functions.size() - 1)))
+            std::println("Recompiling functions... {}%", static_cast<float>(funcIdx + 1) / functions.size() * 100.0f);
 
         auto& fn = functions[funcIdx];
         auto base = fn.base;
