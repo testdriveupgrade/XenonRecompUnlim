@@ -103,7 +103,7 @@ int main()
             }
 
             auto fnSymbol = image.symbols.find(base);
-            if (fnSymbol != image.symbols.end() && fnSymbol->type == Symbol_Function)
+            if (fnSymbol != image.symbols.end() && fnSymbol->address == base && fnSymbol->type == Symbol_Function)
             {
                 assert(fnSymbol->address == base);
 
@@ -183,23 +183,23 @@ int main()
             ++data;
             if (insn.opcode == nullptr)
             {
-                println("\t// {:x} {}", base - 4, insn.op_str);
+                println("\t// {}", insn.op_str);
             }
             else
             {
-                println("\t// {:x} {} {}", base - 4, insn.opcode->name, insn.op_str);
+                println("\t// {} {}", insn.opcode->name, insn.op_str);
 
                 auto printFunctionCall = [&](uint32_t ea)
                 {
                     auto targetSymbol = image.symbols.find(ea);
 
-                    if (targetSymbol != image.symbols.end() && targetSymbol->type == Symbol_Function)
+                    if (targetSymbol != image.symbols.end() && targetSymbol->address == ea && targetSymbol->type == Symbol_Function)
                     {
                         println("\t{}(ctx, base);", targetSymbol->name);
                     }
                     else
                     {
-                        println("\tctx.fn[0x{:X}](ctx, base);", ea / 4);
+                        println("\t// ERROR", ea);
                     }
                 };
 
@@ -299,9 +299,33 @@ int main()
                         println("\tswitch (ctx.r{}.u64) {{", switchTable->second.r);
 
                         for (size_t i = 0; i < switchTable->second.labels.size(); i++)
-                            println("\t\tcase {}: goto loc_{:X};", i, switchTable->second.labels[i]);
+                        {
+                            println("\tcase {}:", i);
+                            auto label = switchTable->second.labels[i];
+                            if (label < fn.base || label >= fn.base + fn.size)
+                            {
+                                auto targetSymbol = image.symbols.find(label);
 
-                        println("\t\tdefault: __unreachable();");
+                                if (targetSymbol != image.symbols.end() && targetSymbol->address == label && targetSymbol->type == Symbol_Function)
+                                {
+                                    println("\t\t{}(ctx, base);", targetSymbol->name);
+                                }
+                                else
+                                {
+                                    println("\t\t// ERROR: 0x{:X}", label);
+                                    std::println("ERROR: Switch case at {:X} calling a function that has no defined symbol: {:X}", base - 4, label);
+                                }
+
+                                println("\t\treturn;");
+                            }
+                            else
+                            {
+                                println("\t\tgoto loc_{:X};", label);
+                            }
+                        }
+
+                        println("\tdefault:");
+                        println("\t\t__unreachable();");
                         println("\t}}");
 
                         switchTable = switchTables.end();
