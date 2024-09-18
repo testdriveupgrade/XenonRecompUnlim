@@ -13,7 +13,7 @@
 #define isnan __builtin_isnan
 #define __assume __builtin_assume
 #define __unreachable() __builtin_unreachable()
-#define PPC_FUNC __attribute__((weak,noinline))
+#define PPC_FUNC __attribute__((noinline))
 #else
 #include <intrin.h>
 #define PPC_FUNC __declspec(noinline)
@@ -466,7 +466,7 @@ inline __m128i _mm_avg_epi16(__m128i a, __m128i b)
     return _mm_add_epi16(c, _mm_avg_epu16(_mm_add_epi16(c, a), _mm_add_epi16(c, b)));
 }
 
-inline __m128 _mm_cvtepu32_ps(__m128i v)
+inline __m128 _mm_cvtepu32_ps_(__m128i v)
 {
     __m128i v2 = _mm_srli_epi32(v, 1);
     __m128i v1 = _mm_sub_epi32(v, v2);
@@ -475,7 +475,7 @@ inline __m128 _mm_cvtepu32_ps(__m128i v)
     return _mm_add_ps(v2f, v1f);
 }
 
-inline __m128i _mm_perm_epi8(__m128i a, __m128i b, __m128i c)
+inline __m128i _mm_perm_epi8_(__m128i a, __m128i b, __m128i c)
 {
     __m128i d = _mm_set1_epi8(0xF);
     __m128i e = _mm_sub_epi8(d, _mm_and_si128(c, d));

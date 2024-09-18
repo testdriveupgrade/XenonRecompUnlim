@@ -10,8 +10,6 @@
 #include <toml++/toml.hpp>
 #include <unordered_map>
 
-#define TEST_FILE "private/default.xex"
-
 static uint64_t computeMask(uint32_t mstart, uint32_t mstop)
 {
     mstart &= 0x3F;
@@ -20,9 +18,13 @@ static uint64_t computeMask(uint32_t mstart, uint32_t mstop)
     return mstart <= mstop ? value : ~value;
 }
 
-int main()
+// argv 1: xex file path
+// argv 2: switches toml file path
+// argv 3: output directory path
+
+int main(int argc, char* argv[])
 {
-    const auto file = LoadFile(TEST_FILE).value();
+    const auto file = LoadFile(argv[1]).value();
     auto image = Image::ParseImage(file.data(), file.size()).value();
 
     std::println("Loading switch tables...");
@@ -35,7 +37,7 @@ int main()
 
     std::unordered_map<size_t, SwitchTable> switchTables;
 
-    toml::table toml = toml::parse_file("out/switches.toml");
+    toml::table toml = toml::parse_file(argv[2]);
     for (auto& entry : *toml["switch"].as_array())
     {
         auto& table = *entry.as_table();
@@ -50,14 +52,8 @@ int main()
 
     std::println("Analysing functions...");
 
-    uint32_t cxxFrameHandler = std::byteswap(0x831B1C90);
-    uint32_t cSpecificFrameHandler = std::byteswap(0x8324B3BC);
-    image.symbols.emplace("__CxxFrameHandler", 0x831B1C90, 0x38, Symbol_Function);
-    image.symbols.emplace("__C_specific_handler", 0x8324B3BC, 0x38, Symbol_Function);
-    image.symbols.emplace("__memcpy", 0x831B0ED0, 0x488, Symbol_Function);
-    image.symbols.emplace("__memset", 0x831B0BA0, 0xA0, Symbol_Function);
-    image.symbols.emplace("__blkmov", 0x831B1358, 0xA8, Symbol_Function);
-    image.symbols.emplace(std::format("sub_{:X}", 0x82EF5D78), 0x82EF5D78, 0x3F8, Symbol_Function);
+    constexpr uint32_t cxxFrameHandler = std::byteswap(0x831B1C90);
+    constexpr uint32_t cSpecificFrameHandler = std::byteswap(0x8324B3BC);
 
     std::vector<Function> functions;
     auto& pdata = *image.Find(".pdata");
@@ -146,7 +142,7 @@ int main()
         {
             if (name.empty())
             {
-                name = std::format("out/ppc_recomp.{}.cpp", cppFileIndex);
+                name = std::format("{}/ppc_recomp.{}.cpp", argv[3], cppFileIndex);
                 ++cppFileIndex;
             }
 
@@ -165,7 +161,7 @@ int main()
         for (auto& symbol : image.symbols)
             println("PPC_FUNC void {}(PPCContext& __restrict ctx, uint8_t* base);", symbol.name);
 
-        saveFile("out/ppc_recomp_shared.h");
+        saveFile(std::format("{}/ppc_recomp_shared.h", argv[3]));
     }
 
     {
@@ -178,12 +174,12 @@ int main()
         println("\t{{ 0, nullptr }}");
         println("}};");
 
-        saveFile("out/ppc_func_mapping.cpp");
+        saveFile(std::format("{}/ppc_func_mapping.cpp", argv[3]));
     }
 
     for (size_t funcIdx = 0; funcIdx < functions.size(); funcIdx++)
     {
-        if ((funcIdx % 1000) == 0)
+        if ((funcIdx % 100) == 0)
         {
             std::println("Recompiling functions... {}%", static_cast<float>(funcIdx) / functions.size() * 100.0f);
 
@@ -1417,7 +1413,7 @@ int main()
 
                 case PPC_INST_VCFUX:
                 case PPC_INST_VCUXWFP128:
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_set1_ps(ldexpf(1.0f, {}))));", insn.operands[0], insn.operands[1], -int32_t(insn.operands[2]));
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps_(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_set1_ps(ldexpf(1.0f, {}))));", insn.operands[0], insn.operands[1], -int32_t(insn.operands[2]));
                     break;
 
                 case PPC_INST_VCMPBFP128:
@@ -1552,7 +1548,7 @@ int main()
 
                 case PPC_INST_VPERM:
                 case PPC_INST_VPERM128:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_perm_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_perm_epi8_(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_VPERMWI128:
