@@ -73,6 +73,55 @@ int main(int argc, char* argv[])
         image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
     }
 
+    for (size_t i = 15; i < 128; i++)
+    {
+        if (i < 32)
+        {
+            auto& restgpr = functions.emplace_back();
+            restgpr.base = 0x831B0B40 + (i - 14) * 4;
+            restgpr.size = 0x831B0B94 - restgpr.base;
+            image.symbols.emplace(std::format("__restgprlr_{}", i), restgpr.base, restgpr.size, Symbol_Function);      
+            
+            auto& savegpr = functions.emplace_back();
+            savegpr.base = 0x831B0AF0 + (i - 14) * 4;
+            savegpr.size = 0x831B0B40 - savegpr.base;
+            image.symbols.emplace(std::format("__savegprlr_{}", i), savegpr.base, savegpr.size, Symbol_Function);      
+            
+            auto& restfpr = functions.emplace_back();
+            restfpr.base = 0x831B144C + (i - 14) * 4;
+            restfpr.size = 0x831B1498 - restfpr.base;
+            image.symbols.emplace(std::format("__restfpr_{}", i), restfpr.base, restfpr.size, Symbol_Function);      
+            
+            auto& savefpr = functions.emplace_back();
+            savefpr.base = 0x831B1400 + (i - 14) * 4;
+            savefpr.size = 0x831B144C - savefpr.base;
+            image.symbols.emplace(std::format("__savefpr_{}", i), savefpr.base, savefpr.size, Symbol_Function);     
+            
+            auto& restvmx = functions.emplace_back();
+            restvmx.base = 0x831B36E8 + (i - 14) * 8;
+            restvmx.size = 0x831B377C - restvmx.base;
+            image.symbols.emplace(std::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);      
+            
+            auto& savevmx = functions.emplace_back();
+            savevmx.base = 0x831B3450 + (i - 14) * 8;
+            savevmx.size = 0x831B34E4 - savevmx.base;
+            image.symbols.emplace(std::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
+        }
+
+        if (i >= 64)
+        {
+            auto& restvmx = functions.emplace_back();
+            restvmx.base = 0x831B377C + (i - 64) * 8;
+            restvmx.size = 0x831B3980 - restvmx.base;
+            image.symbols.emplace(std::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
+
+            auto& savevmx = functions.emplace_back();
+            savevmx.base = 0x831B34E4 + (i - 64) * 8;
+            savevmx.size = 0x831B36E8 - savevmx.base;
+            image.symbols.emplace(std::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
+        }
+    }
+
     for (const auto& section : image.sections)
     {
         if (!(section.flags & SectionFlags_Code))
@@ -111,6 +160,37 @@ int main(int argc, char* argv[])
             else
             {
                 auto& missingFn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
+
+                if (base == 0x824E7EF0) missingFn.size = 0x98;
+                else if (base == 0x824E7F28) missingFn.size = 0x60;
+                else if (base == 0x82C980E8) missingFn.size = 0x110;
+                else if (base == 0x82CF7080) missingFn.size = 0x80;
+                else if (base == 0x82D9AC08) missingFn.size = 0x78;
+                else if (base == 0x82E86770) missingFn.size = 0x98;
+                else if (base == 0x82E97E50) missingFn.size = 0x84;
+                else if (base == 0x82EE2D08) missingFn.size = 0x154;
+                else if (base == 0x82EF5C38) missingFn.size = 0x64;
+                else if (base == 0x82EF5D78) missingFn.size = 0x3F8;
+                else if (base == 0x82F08730) missingFn.size = 0x2B0;
+                else if (base == 0x82F098C0) missingFn.size = 0x19C;
+                else if (base == 0x82F13980) missingFn.size = 0xF4;
+                else if (base == 0x82F1D668) missingFn.size = 0x1E8;
+                else if (base == 0x82F22908) missingFn.size = 0x20C;
+                else if (base == 0x82F25FD8) missingFn.size = 0x240;
+                else if (base == 0x82F852A0) missingFn.size = 0xCC;
+                else if (base == 0x830DADA0) missingFn.size = 0x150;
+                else if (base == 0x831487D0) missingFn.size = 0xD4;
+                else if (base == 0x831530C8) missingFn.size = 0x258;
+                else if (base == 0x831539E0) missingFn.size = 0xD0;
+                else if (base == 0x83168940) missingFn.size = 0x100;
+                else if (base == 0x83168A48) missingFn.size = 0x11C;
+                else if (base == 0x83168B70) missingFn.size = 0x128;
+                else if (base == 0x83168F18) missingFn.size = 0x254;
+                else if (base == 0x8316C678) missingFn.size = 0x78;
+                else if (base == 0x8317CD30) missingFn.size = 0x50;
+                else if (base == 0x83180700) missingFn.size = 0x74;
+                else if (base == 0x8319ED58) missingFn.size = 0x98;
+
                 image.symbols.emplace(std::format("sub_{:X}", missingFn.base), missingFn.base, missingFn.size, Symbol_Function);
 
                 base += missingFn.size;
@@ -200,6 +280,8 @@ int main(int argc, char* argv[])
 
         saveFile(std::format("{}/ppc_func_mapping.cpp", argv[3]));
     }
+
+    std::sort(functions.begin(), functions.end(), [](auto& lhs, auto& rhs) { return lhs.base < rhs.base; });
 
     for (size_t funcIdx = 0; funcIdx < functions.size(); funcIdx++)
     {
