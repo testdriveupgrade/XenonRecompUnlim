@@ -513,6 +513,16 @@ int main(int argc, char* argv[])
                     println("\tctx.fn[ctx.ctr.u32 / 4](ctx, base);");
                     break;
 
+                case PPC_INST_BDZ:
+                    println("\t--ctx.ctr.u64;");
+                    println("\tif (ctx.ctr.u32 == 0) goto loc_{:X};", insn.operands[0]);
+                    break;
+
+                case PPC_INST_BDZLR:
+                    println("\t--ctx.ctr.u64;");
+                    println("\tif (ctx.ctr.u32 == 0) return;", insn.operands[0]);
+                    break;
+
                 case PPC_INST_BDNZ:
                     println("\t--ctx.ctr.u64;");
                     println("\tif (ctx.ctr.u32 != 0) goto loc_{:X};", insn.operands[0]);
@@ -1379,12 +1389,50 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_STVEHX:
+                    // TODO: vectorize
+                    // NOTE: accounting for the full vector reversal here
+                    print("\tea = (");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32) & ~0x1;", insn.operands[2]);
+                    println("\tPPC_STORE_U16(ea, ctx.v{}.u16[7 - ((ea & 0xF) >> 1)]);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_STVEWX:
                 case PPC_INST_STVEWX128:
+                    // TODO: vectorize
+                    // NOTE: accounting for the full vector reversal here
+                    print("\tea = (");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32) & ~0x3;", insn.operands[2]);
+                    println("\tPPC_STORE_U32(ea, ctx.v{}.u32[3 - ((ea & 0xF) >> 2)]);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_STVLX:
                 case PPC_INST_STVLX128:
+                    // TODO: vectorize
+                    // NOTE: accounting for the full vector reversal here
+                    print("\tea = ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32;", insn.operands[2]);
+
+                    println("\tfor (size_t i = 0; i < (16 - (ea & 0xF)); i++)");
+                    println("\t\tPPC_STORE_U8(ea + i, ctx.v{}.u8[15 - i]);", insn.operands[0]);
+                    break;
+
                 case PPC_INST_STVRX:
                 case PPC_INST_STVRX128:
+                    // TODO: vectorize
+                    // NOTE: accounting for the full vector reversal here
+                    print("\tea = ");
+                    if (insn.operands[1] != 0)
+                        print("ctx.r{}.u32 + ", insn.operands[1]);
+                    println("ctx.r{}.u32;", insn.operands[2]);
+
+                    println("\tfor (size_t i = 0; i < (ea & 0xF); i++)");
+                    println("\t\tPPC_STORE_U8((ea & ~0xF) + i, ctx.v{}.u8[15 - ((16 - (ea & 0xF)) + i)]);", insn.operands[0]);
                     break;
 
                 case PPC_INST_STVX:
@@ -1429,7 +1477,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_STWUX:
                     println("\tea = ctx.r{}.u32 + ctx.r{}.u32;", insn.operands[1], insn.operands[2]);
                     println("\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
-                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[1]);
                     break;
 
                 case PPC_INST_STWX:
@@ -1609,13 +1657,8 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VMADDCFP128:
-                    // TODO: wrong argument order
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_fmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
-                    break;
-
                 case PPC_INST_VMADDFP:
                 case PPC_INST_VMADDFP128:
-                    // TODO: wrong argument order
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_fmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
@@ -1726,7 +1769,11 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VRLIMI128:
+                {
+                    constexpr size_t imm[] = { _MM_SHUFFLE(0, 1, 2, 3), _MM_SHUFFLE(1, 2, 3, 0), _MM_SHUFFLE(2, 3, 0, 1), _MM_SHUFFLE(3, 0, 1, 2) };
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_blend_ps(_mm_load_ps(ctx.v{}.f32), _mm_permute_ps(_mm_load_ps(ctx.v{}.f32), {}), {}));", insn.operands[0], insn.operands[0], insn.operands[1], imm[insn.operands[3]], insn.operands[2]);
                     break;
+                }
 
                 case PPC_INST_VRSQRTEFP:
                 case PPC_INST_VRSQRTEFP128:
@@ -1753,6 +1800,14 @@ int main(int argc, char* argv[])
                     for (size_t i = 0; i < 4; i++)
                         println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] << ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
                     break;
+
+                case PPC_INST_VSPLTB:
+                {
+                    // NOTE: accounting for full vector reversal here
+                    uint32_t perm = 15 - insn.operands[2];
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_shuffle_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_set1_epi8({})));", insn.operands[0], insn.operands[1], perm);
+                    break;
+                }
 
                 case PPC_INST_VSPLTH:
                 {
@@ -1786,6 +1841,10 @@ int main(int argc, char* argv[])
                 }
 
                 case PPC_INST_VSR:
+                    // TODO: vectorize
+                    println("\ttemp.u64 = ctx.v{}.u8[15] & 0x7;", insn.operands[2]);
+                    println("\tctx.v{}.u64[1] = (ctx.v{}.u64[0] << (64 - temp.u64)) | (ctx.v{}.u64[1] >> temp.u64);", insn.operands[0], insn.operands[1], insn.operands[1]);
+                    println("\tctx.v{}.u64[0] = ctx.v{}.u64[0] >> temp.u64;", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_VSRAW128:
@@ -1807,6 +1866,12 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VSUBSWS:
+                    // TODO: vectorize
+                    for (size_t i = 0; i < 4; i++)
+                    {
+                        println("\ttemp.s64 = int64_t(ctx.v{}.s32[{}]) - int64_t(ctx.v{}.s32[{}]);", insn.operands[1], i, insn.operands[2], i);
+                        println("\tctx.v{}.s32[{}] = temp.s64 > INT_MAX ? INT_MAX : temp.s64 < INT_MIN ? INT_MIN : temp.s64;", insn.operands[0], i);
+                    }
                     break;
 
                 case PPC_INST_VSUBUBS:
@@ -1818,6 +1883,22 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VUPKD3D128:
+                    // TODO: vectorize somehow?
+                    // NOTE: for some reason with binutils 2nd operand is multiplied by 4
+                    // NOTE: handling vector reversal here too
+                    switch (insn.operands[2])
+                    {
+                    case 4: // 2 shorts
+                        for (size_t i = 0; i < 2; i++)
+                        {
+                            println("\ttemp.f32 = 3.0f;");
+                            println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], 7 - i); // TODO: not sure about the indexing here
+                            println("\tctx.v{}.f32[{}] = temp.f32;", insn.operands[0], 3 - i);
+                        }
+                        println("\tctx.v{}.f32[1] = 0.0f;", insn.operands[0]);
+                        println("\tctx.v{}.f32[0] = 1.0f;", insn.operands[0]);
+                        break;
+                    }
                     break;
 
                 case PPC_INST_VUPKHSB128:
@@ -1855,6 +1936,10 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_XORIS:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 ^ {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
+                    break;
+
+                default:
+                    std::println("Unrecognized instruction at 0x{:X}: {}", base - 4, insn.opcode->name);
                     break;
                 }
             }
