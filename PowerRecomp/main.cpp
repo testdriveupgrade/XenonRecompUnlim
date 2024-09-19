@@ -305,7 +305,7 @@ int main(int argc, char* argv[])
     {
         println("#include \"ppc_recomp_shared.h\"\n");
 
-        println("const struct PPCFuncMapping PPCFuncMapping[] = {{");
+        println("extern \"C\" PPCFuncMapping PPCFuncMappings[] = {{");
         for (auto& symbol : image.symbols)
             println("\t{{ 0x{:X}, {} }},", symbol.address, symbol.name);
 
@@ -403,7 +403,7 @@ int main(int argc, char* argv[])
                 {
                 case PPC_INST_ADD:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 + ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -415,8 +415,9 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_ADDIC:
-                    println("\tctx.xer.ca = _addcarry_u64(0, ctx.r{}.u64, uint64_t(int64_t({})), &ctx.r{}.u64);", insn.operands[1], static_cast<int32_t>(insn.operands[2]), insn.operands[0]);
-                    if (insn.opcode->opcode & 0x1)
+                    println("\tctx.xer.ca = ctx.r{}.u32 > {};", insn.operands[1], ~insn.operands[2]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 + {};", insn.operands[0], insn.operands[1], static_cast<int32_t>(insn.operands[2]));
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -428,33 +429,33 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_ADDZE:
-                    println("\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ctx.r{}.u64, 0, &ctx.r{}.u64);", insn.operands[1], insn.operands[0]);
-                    if (insn.opcode->opcode & 0x1)
+                    println("\ttemp.s64 = ctx.r{}.s64 + ctx.xer.ca;", insn.operands[1]);
+                    println("\tctx.xer.ca = temp.u32 < ctx.r{}.u32;", insn.operands[1]);
+                    println("\tctx.r{}.s64 = temp.s64;", insn.operands[0]);
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_AND:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 & ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ANDC:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 & ~ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ANDI:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
-                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ANDIS:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 & {};", insn.operands[0], insn.operands[1], insn.operands[2] << 16);
-                    if (insn.opcode->opcode & 0x1)
-                        println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+                    println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_ATTN:
@@ -502,23 +503,23 @@ int main(int argc, char* argv[])
                     }
                     else
                     {
-                        println("\tctx.fn[ctx.ctr / 4](ctx, base);");
+                        println("\tctx.fn[ctx.ctr.u32 / 4](ctx, base);");
                         println("\treturn;");
                     }
                     break;
 
                 case PPC_INST_BCTRL:
                     println("\tctx.lr = 0x{:X};", base);
-                    println("\tctx.fn[ctx.ctr / 4](ctx, base);");
+                    println("\tctx.fn[ctx.ctr.u32 / 4](ctx, base);");
                     break;
 
                 case PPC_INST_BDNZ:
-                    println("\tif (--ctx.ctr != 0) goto loc_{:X};", insn.operands[0]);
+                    println("\tif (--ctx.ctr.u64 != 0) goto loc_{:X};", insn.operands[0]);
                     break;
 
                 case PPC_INST_BDNZF:
                     // NOTE: assuming eq here as a shortcut because all the instructions in the game do that
-                    println("\tif (--ctx.ctr != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0] / 4, insn.operands[1]);
+                    println("\tif (--ctx.ctr.u64 != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0] / 4, insn.operands[1]);
                     break;
 
                 case PPC_INST_BEQ:
@@ -580,7 +581,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_BNECTR:
                     println("\tif (!ctx.cr{}.eq) {{", insn.operands[0]);
-                    println("\t\tctx.fn[ctx.ctr / 4](ctx, base);");
+                    println("\t\tctx.fn[ctx.ctr.u32 / 4](ctx, base);");
                     println("\t\treturn;");
                     println("\t}}");
                     break;
@@ -603,7 +604,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_CLRLWI:
                     println("\tctx.r{}.u64 = ctx.r{}.u32 & 0x{:X};", insn.operands[0], insn.operands[1], (1ull << (32 - insn.operands[2])) - 1);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -687,13 +688,13 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_DIVW:
                     println("\tctx.r{}.s32 = ctx.r{}.s32 / ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_DIVWU:
                     println("\tctx.r{}.u32 = ctx.r{}.u32 / ctx.r{}.u32;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -703,13 +704,13 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_EXTSB:
                     println("\tctx.r{}.s64 = ctx.r{}.s8;", insn.operands[0], insn.operands[1]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_EXTSH:
                     println("\tctx.r{}.s64 = ctx.r{}.s16;", insn.operands[0], insn.operands[1]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1080,7 +1081,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_MR:
                     println("\tctx.r{}.u64 = ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1093,7 +1094,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_MTCTR:
-                    println("\tctx.ctr = ctx.r{}.u64;", insn.operands[0]);
+                    println("\tctx.ctr.u64 = ctx.r{}.u64;", insn.operands[0]);
                     break;
 
                 case PPC_INST_MTFSF:
@@ -1132,7 +1133,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_MULLW:
                     println("\tctx.r{}.s64 = ctx.r{}.s32 * ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1142,7 +1143,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_NEG:
                     println("\tctx.r{}.s64 = -ctx.r{}.s64;", insn.operands[0], insn.operands[1]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1156,13 +1157,13 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_NOT:
                     println("\tctx.r{}.u64 = ~ctx.r{}.u64;", insn.operands[0], insn.operands[1]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_OR:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 | ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1202,7 +1203,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_RLWINM:
                     println("\tctx.r{}.u64 = _rotl(ctx.r{}.u32, {}) & 0x{:X};", insn.operands[0], insn.operands[1], insn.operands[2], computeMask(insn.operands[3] + 32, insn.operands[4] + 32));
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1216,7 +1217,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_ROTLWI:
                     println("\tctx.r{}.u64 = _rotl(ctx.r{}.u32, {});", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1226,7 +1227,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_SLW:
                     println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : ctx.r{}.u32 << (ctx.r{}.u8 & 0x3F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1252,7 +1253,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_SRAWI:
                     println("\tctx.xer.ca = (ctx.r{}.s32 < 0) & ((ctx.r{}.u32 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], computeMask(64 - insn.operands[2], 63));
                     println("\tctx.r{}.s64 = ctx.r{}.s32 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1262,7 +1263,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_SRW:
                     println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : ctx.r{}.u32 >> (ctx.r{}.u8 & 0x3F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
@@ -1437,23 +1438,26 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_SUBF:
-                    println("\tctx.r{}.s64 = ctx.r{}.s64 - ctx.r{}.s64;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 - ctx.r{}.s64;", insn.operands[0], insn.operands[2], insn.operands[1]);
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBFC:
-                    println("\tctx.xer.ca = _subborrow_u64(0, ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[2], insn.operands[1], insn.operands[0]);
-                    if (insn.opcode->opcode & 0x1)
+                    println("\tctx.xer.ca = ctx.r{}.u32 >= ctx.r{}.u32;", insn.operands[2], insn.operands[1]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s64 - ctx.r{}.s64;", insn.operands[0], insn.operands[2], insn.operands[1]);
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_SUBFE:
-                    println("\tctx.xer.ca = _addcarry_u64(ctx.xer.ca, ~ctx.r{}.u64, ctx.r{}.u64, &ctx.r{}.u64);", insn.operands[1], insn.operands[2], insn.operands[0]);
+                    // TODO: do we need to set the carry flag here?
+                    println("\tctx.r{}.s64 = ~ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_SUBFIC:
-                    println("\tctx.xer.ca = _subborrow_u64(0, uint64_t(int64_t({})), ctx.r{}.u64, &ctx.r{}.u64);", static_cast<int32_t>(insn.operands[2]), insn.operands[1], insn.operands[0]);
+                    println("\tctx.xer.ca = ctx.r{}.u32 <= {};", insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = {} - ctx.r{}.s64;", insn.operands[0], static_cast<int32_t>(insn.operands[2]), insn.operands[1]);
                     break;
 
                 case PPC_INST_SYNC:
@@ -1557,28 +1561,28 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_VCMPEQUB:
                     println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpeq_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr6.setFromMask(_mm_load_si128((__m128i*)ctx.v{}.u8), 0xFFFF);", insn.operands[0]);
                     break;
 
                 case PPC_INST_VCMPEQUW:
                 case PPC_INST_VCMPEQUW128:
                     println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpeq_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), _mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if ((insn.opcode->id == PPC_INST_VCMPEQUW && (insn.opcode->opcode & 0x1)) || (insn.opcode->id == PPC_INST_VCMPEQUW128 && (insn.opcode->opcode & 0x40)))
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
                     break;
 
                 case PPC_INST_VCMPGEFP:
                 case PPC_INST_VCMPGEFP128:
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpge_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->id == PPC_INST_VCMPGEFP128 && (insn.opcode->opcode & 0x40))
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
                     break;
 
                 case PPC_INST_VCMPGTFP:
                 case PPC_INST_VCMPGTFP128:
                     println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpgt_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->id == PPC_INST_VCMPGTFP128 && (insn.opcode->opcode & 0x40))
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
                     break;
 
@@ -1839,7 +1843,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_XOR:
                     println("\tctx.r{}.u64 = ctx.r{}.u64 ^ ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
-                    if (insn.opcode->opcode & 0x1)
+                    if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 

@@ -13,10 +13,10 @@
 #define isnan __builtin_isnan
 #define __assume __builtin_assume
 #define __unreachable() __builtin_unreachable()
-#define PPC_FUNC __attribute__((noinline))
+#define PPC_FUNC extern "C" __attribute__((noinline))
 #else
 #include <intrin.h>
-#define PPC_FUNC __declspec(noinline)
+#define PPC_FUNC extern "C" __declspec(noinline)
 #define __unreachable() __assume(0)
 #endif
 
@@ -38,7 +38,7 @@ struct PPCFuncMapping
     PPCFunc* host;
 };
 
-extern const struct PPCFuncMapping PPCFuncMapping[];
+extern "C" PPCFuncMapping PPCFuncMappings[];
 
 struct PPCRegister
 {
@@ -132,7 +132,7 @@ struct PPCContext
 {
     PPCFunc** fn;
     uint64_t lr;
-    uint64_t ctr;
+    PPCRegister ctr;
     PPCXERRegister xer;
     PPCRegister reserved;
     uint32_t msr;
