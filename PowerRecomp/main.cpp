@@ -514,12 +514,14 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_BDNZ:
-                    println("\tif (--ctx.ctr.u64 != 0) goto loc_{:X};", insn.operands[0]);
+                    println("\t--ctx.ctr.u64;");
+                    println("\tif (ctx.ctr.u32 != 0) goto loc_{:X};", insn.operands[0]);
                     break;
 
                 case PPC_INST_BDNZF:
                     // NOTE: assuming eq here as a shortcut because all the instructions in the game do that
-                    println("\tif (--ctx.ctr.u64 != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0] / 4, insn.operands[1]);
+                    println("\t--ctx.ctr.u64;");
+                    println("\tif (ctx.ctr.u32 != 0 && !ctx.cr{}.eq) goto loc_{:X};", insn.operands[0] / 4, insn.operands[1]);
                     break;
 
                 case PPC_INST_BEQ:
@@ -1277,7 +1279,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_STBU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tPPC_STORE_U8(ea, ctx.r{}.u8);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STBX:
@@ -1308,7 +1310,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_STDU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tPPC_STORE_U64(ea, ctx.r{}.u64);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STDX:
@@ -1421,13 +1423,13 @@ int main(int argc, char* argv[])
                 case PPC_INST_STWU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[0]);
+                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STWUX:
                     println("\tea = ctx.r{}.u32 + ctx.r{}.u32;", insn.operands[1], insn.operands[2]);
                     println("\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
-                    println("\tctx.r{}.u32 = ea;", insn.operands[0]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STWX:
