@@ -459,13 +459,13 @@ inline __m128i _mm_adds_epu32(__m128i a, __m128i b)
 inline __m128i _mm_avg_epi8(__m128i a, __m128i b)
 {
     __m128i c = _mm_set1_epi8(char(128));
-    return _mm_add_epi8(c, _mm_avg_epu8(_mm_add_epi8(c, a), _mm_add_epi8(c, b)));
+    return _mm_xor_si128(c, _mm_avg_epu8(_mm_xor_si128(c, a), _mm_xor_si128(c, b)));
 }
 
 inline __m128i _mm_avg_epi16(__m128i a, __m128i b)
 {
     __m128i c = _mm_set1_epi16(short(32768));
-    return _mm_add_epi16(c, _mm_avg_epu16(_mm_add_epi16(c, a), _mm_add_epi16(c, b)));
+    return _mm_xor_si128(c, _mm_avg_epu16(_mm_xor_si128(c, a), _mm_xor_si128(c, b)));
 }
 
 inline __m128 _mm_cvtepu32_ps_(__m128i v)
@@ -486,13 +486,27 @@ inline __m128i _mm_perm_epi8_(__m128i a, __m128i b, __m128i c)
 
 inline __m128i _mm_cmpgt_epu8(__m128i a, __m128i b)
 {
-    __m128i c = _mm_set1_epi8(0x80);
+    __m128i c = _mm_set1_epi8(char(128));
     return _mm_cmpgt_epi8(_mm_xor_si128(a, c), _mm_xor_si128(b, c));
 }
 
 inline __m128i _mm_cmpgt_epu16(__m128i a, __m128i b)
 {
-    __m128i c = _mm_set1_epi16(0x8000);
+    __m128i c = _mm_set1_epi16(short(32768));
     return _mm_cmpgt_epi16(_mm_xor_si128(a, c), _mm_xor_si128(b, c));
 }
 
+inline __m128i _mm_vctsxs(__m128 a)
+{
+    __m128i result = _mm_cvttps_epi32(a);
+
+    __m128 max_val = _mm_set1_ps(2147483648.0f);
+    __m128 cmp_mask = _mm_cmpgt_ps(a, max_val);
+
+    result = _mm_xor_si128(result, _mm_castps_si128(cmp_mask));
+
+    __m128 ord_mask = _mm_cmpord_ps(a, a);
+    result = _mm_and_si128(result, _mm_castps_si128(ord_mask));
+
+    return result;
+}
