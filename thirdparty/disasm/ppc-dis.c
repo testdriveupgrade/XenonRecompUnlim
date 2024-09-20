@@ -832,7 +832,7 @@ const struct powerpc_operand powerpc_operands[] =
                             /* The VC128 field in a VA, VX, VXR or X form instruction. */
                           #define VC128 VB128 + 1
                            #define VC128_MASK (0x1f << 21)
-                           { 3, 6, NULL, NULL, PPC_OPERAND_VR },
+                           { 7, 6, NULL, NULL, PPC_OPERAND_VR },
                           
                             /* The VPERM field in a VPERM128 form instruction. */
                           #define VPERM128 VC128 + 1
@@ -2521,7 +2521,7 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 { "vlogefp128", VX128_3(6, 1776), VX128_3_MASK, PPCVEC128, { VD128, VB128 }, PPC_INST_VLOGEFP128 },
 { "vrlimi128", VX128_4(6, 1808), VX128_4_MASK, PPCVEC128, { VD128, VB128, UIMM, VD3D2 }, PPC_INST_VRLIMI128 },
 { "vspltw128", VX128_3(6, 1840), VX128_3_MASK, PPCVEC128, { VD128, VB128, UIMM }, PPC_INST_VSPLTW128 },
-{ "vspltisw128", VX128_3(6, 1904), VX128_3_MASK, PPCVEC128, { VD128, VB128, SIMM }, PPC_INST_VSPLTISW128 },
+{ "vspltisw128", VX128_3(6, 1904), VX128_3_MASK, PPCVEC128, { VD128, SIMM }, PPC_INST_VSPLTISW128 },
 { "vupkd3d128", VX128_3(6, 2032), VX128_3_MASK, PPCVEC128, { VD128, VB128, UIMM }, PPC_INST_VUPKD3D128 },
 { "vcmpeqfp128", VX128(6, 0), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 }, PPC_INST_VCMPEQFP128 },
 { "vcmpeqfp128.", VX128(6, 64), VX128_MASK, PPCVEC128, { VD128, VA128, VB128 }, PPC_INST_VCMPEQFP128 },

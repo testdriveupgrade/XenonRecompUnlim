@@ -55,6 +55,7 @@ int main(int argc, char* argv[])
 
     constexpr uint32_t cxxFrameHandler = std::byteswap(0x831B1C90);
     constexpr uint32_t cSpecificFrameHandler = std::byteswap(0x8324B3BC);
+    constexpr uint32_t yetAnotherFrameHandler = std::byteswap(0x831C8B50);
 
     std::vector<Function> functions;
     auto& pdata = *image.Find(".pdata");
@@ -205,7 +206,7 @@ int main(int argc, char* argv[])
                 continue;
             }
 
-            if (*(uint32_t*)data == cxxFrameHandler || *(uint32_t*)data == cSpecificFrameHandler)
+            if (*(uint32_t*)data == cxxFrameHandler || *(uint32_t*)data == cSpecificFrameHandler || *(uint32_t*)data == yetAnotherFrameHandler)
             {
                 data += 8;
                 base += 8;
@@ -345,6 +346,7 @@ int main(int argc, char* argv[])
 
         println("\t__assume((reinterpret_cast<size_t>(base) & 0xFFFFFFFF) == 0);");
         println("\tPPCRegister temp;");
+        println("\tPPCVRegister vtemp;");
         println("\tuint32_t ea;\n");
 
         auto switchTable = switchTables.end();
@@ -364,7 +366,10 @@ int main(int argc, char* argv[])
             if (insn.opcode == nullptr)
             {
                 println("\t// {}", insn.op_str);
-                std::println("Unable to decode instruction at 0x{:X}", base - 4);
+#if 0
+                if (*(data - 1) != 0)
+                    std::println("Unable to decode instruction {:X} at {:X}", *(data - 1), base - 4);
+#endif
             }
             else
             {
@@ -737,7 +742,6 @@ int main(int argc, char* argv[])
                     println("\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
                     break;
 
-                    // TODO: fpu operations require denormal flushing checks
                 case PPC_INST_FABS:
                     println("\tctx.csr.setFlushMode(false);");
                     println("\tctx.f{}.f64 = fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
@@ -754,7 +758,6 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_FCFID:
-                    // TODO: rounding mode?
                     println("\tctx.csr.setFlushMode(false);");
                     println("\tctx.f{}.f64 = ctx.f{}.s64;", insn.operands[0], insn.operands[1]);
                     break;
@@ -765,9 +768,8 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_FCTID:
-                    // TODO: rounding mode?
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.s64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s64 = round(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCTIDZ:
@@ -837,7 +839,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_FNMADDS:
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = float(-(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FNMSUB:
@@ -847,7 +849,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_FNMSUBS:
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.f64 = -float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+                    println("\tctx.f{}.f64 = float(-(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
                     break;
 
                 case PPC_INST_FRES:
@@ -866,6 +868,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_FSQRT:
+                    println("\tctx.csr.setFlushMode(false);");
                     println("\tctx.f{}.f64 = sqrt(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
                     break;
 
@@ -1392,7 +1395,7 @@ int main(int argc, char* argv[])
                     println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
                     print("\tPPC_STORE_U32(");
                     if (insn.operands[2] != 0)
-                        print("ctx.r{}.u32 +", insn.operands[2]);
+                        print("ctx.r{}.u32 + ", insn.operands[2]);
                     println("{}, temp.u32);", int32_t(insn.operands[1]));
                     break;
 
@@ -1469,7 +1472,7 @@ int main(int argc, char* argv[])
                     println("ctx.r{}.u32;", insn.operands[2]);
 
                     println("\tfor (size_t i = 0; i < (ea & 0xF); i++)");
-                    println("\t\tPPC_STORE_U8((ea & ~0xF) + i, ctx.v{}.u8[15 - ((16 - (ea & 0xF)) + i)]);", insn.operands[0]);
+                    println("\t\tPPC_STORE_U8(ea - i - 1, ctx.v{}.u8[i]);", insn.operands[0]);
                     break;
 
                 case PPC_INST_STVX:
@@ -1539,7 +1542,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_SUBFE:
                     // TODO: do we need to set the carry flag here?
-                    println("\tctx.r{}.s64 = ~ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ~ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_SUBFIC:
@@ -1548,7 +1551,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_SYNC:
-                    // no op?
+                    println("\t__faststorefence();");
                     break;
 
                 case PPC_INST_TDLGEI:
@@ -1571,7 +1574,6 @@ int main(int argc, char* argv[])
                     // no op
                     break;
 
-                    // TODO: vector instructions require denormal flushing checks
                 case PPC_INST_VADDFP:
                 case PPC_INST_VADDFP128:
                     println("\tctx.csr.setFlushMode(true);");
@@ -1626,20 +1628,28 @@ int main(int argc, char* argv[])
                 case PPC_INST_VCTSXS:
                 case PPC_INST_VCFPSXWS128:
                     println("\tctx.csr.setFlushMode(true);");
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_vctsxs(_mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_set1_ps(exp2f({})))));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_vctsxs(_mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_set1_ps({}))));", insn.operands[0], insn.operands[1], 1u << insn.operands[2]);
                     break;
 
                 case PPC_INST_VCFSX:
                 case PPC_INST_VCSXWFP128:
+                {
+                    const float v = ldexp(1.0f, -int32_t(insn.operands[2]));
+
                     println("\tctx.csr.setFlushMode(true);");
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_set1_ps(ldexpf(1.0f, {}))));", insn.operands[0], insn.operands[1], -int32_t(insn.operands[2]));
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castps_si128(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
                     break;
+                }
 
                 case PPC_INST_VCFUX:
                 case PPC_INST_VCUXWFP128:
+                {
+                    const float v = ldexp(1.0f, -int32_t(insn.operands[2]));
+
                     println("\tctx.csr.setFlushMode(true);");
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps_(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_set1_ps(ldexpf(1.0f, {}))));", insn.operands[0], insn.operands[1], -int32_t(insn.operands[2]));
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps_(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castps_si128(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
                     break;
+                }
 
                 case PPC_INST_VCMPBFP128:
                     println("\t__debugbreak();");
@@ -1726,29 +1736,29 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VMRGHB:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_unpackhi_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_unpackhi_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VMRGHH:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u16, _mm_unpackhi_epi16(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_load_si128((__m128i*)ctx.v{}.u16)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u16, _mm_unpackhi_epi16(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_load_si128((__m128i*)ctx.v{}.u16)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VMRGHW:
                 case PPC_INST_VMRGHW128:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_unpackhi_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), _mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_unpackhi_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), _mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VMRGLB:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_unpacklo_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_unpacklo_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VMRGLH:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u16, _mm_unpacklo_epi16(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_load_si128((__m128i*)ctx.v{}.u16)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u16, _mm_unpacklo_epi16(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_load_si128((__m128i*)ctx.v{}.u16)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VMRGLW:
                 case PPC_INST_VMRGLW128:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_unpacklo_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), _mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_unpacklo_epi32(_mm_load_si128((__m128i*)ctx.v{}.u32), _mm_load_si128((__m128i*)ctx.v{}.u32)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VMSUM3FP128:
@@ -1808,7 +1818,7 @@ int main(int argc, char* argv[])
                         for (size_t i = 0; i < 4; i++)
                         {
                             constexpr size_t indices[] = { 3, 0, 1, 2 };
-                            println("\ttemp.u32 {}= ctx.v{}.u8[{}] << {};", i == 0 ? "" : "|", insn.operands[1], i * 4, indices[i] * 8);
+                            println("\ttemp.u32 {}= uint32_t(ctx.v{}.u8[{}]) << {};", i == 0 ? "" : "|", insn.operands[1], i * 4, indices[i] * 8);
                         }
                         println("\tctx.v{}.u32[3] = temp.u32;", insn.operands[0]);
                         break;
@@ -1820,7 +1830,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VPKSHUS:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_packus_epi16(_mm_load_si128((__m128i*)ctx.v{}.s16), _mm_load_si128((__m128i*)ctx.v{}.s16)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_packus_epi16(_mm_load_si128((__m128i*)ctx.v{}.s16), _mm_load_si128((__m128i*)ctx.v{}.s16)));", insn.operands[0], insn.operands[2], insn.operands[1]);
                     break;
 
                 case PPC_INST_VREFP:
@@ -1901,11 +1911,8 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_VSPLTISW:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_set1_epi32(int(0x{:X})));", insn.operands[0], insn.operands[1]);
-                    break;
-
                 case PPC_INST_VSPLTISW128:
-                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_set1_epi32(int(0x{:X})));", insn.operands[0], insn.operands[2]);
+                    println("\t_mm_store_si128((__m128i*)ctx.v{}.u32, _mm_set1_epi32(int(0x{:X})));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_VSPLTW:
@@ -1970,21 +1977,21 @@ int main(int argc, char* argv[])
                         for (size_t i = 0; i < 4; i++)
                         {
                             constexpr size_t indices[] = { 3, 0, 1, 2 };
-                            println("\ttemp.f32 = 1.0f;");
-                            println("\ttemp.u32 |= ctx.v{}.u8[{}];", insn.operands[1], indices[i]);
-                            println("\tctx.v{}.f32[{}] = temp.f32;", insn.operands[0], i);
+                            println("\tvtemp.u32[{}] = ctx.v{}.u8[{}] | 0x3F800000;", i, insn.operands[1], indices[i]);
                         }
+                        println("\tctx.v{} = vtemp;", insn.operands[0]);
                         break;
 
                     case 1: // 2 shorts
                         for (size_t i = 0; i < 2; i++)
                         {
                             println("\ttemp.f32 = 3.0f;");
-                            println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], i); // TODO: not sure about the indexing here
-                            println("\tctx.v{}.f32[{}] = temp.f32;", insn.operands[0], 3 - i);
+                            //println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], i); // TODO: not sure about the indexing here
+                            println("\tvtemp.f32[{}] = temp.f32;", 3 - i);
                         }
-                        println("\tctx.v{}.f32[1] = 0.0f;", insn.operands[0]);
-                        println("\tctx.v{}.f32[0] = 1.0f;", insn.operands[0]);
+                        println("\tvtemp.f32[1] = 0.0f;");
+                        println("\tvtemp.f32[0] = 1.0f;");
+                        println("\tctx.v{} = vtemp;", insn.operands[0]);
                         break;
 
                     default:
@@ -2035,12 +2042,14 @@ int main(int argc, char* argv[])
                     break;
                 }
 
+#if 0
                 if (strchr(insn.opcode->name, '.'))
                 {
                     int lastLine = out.find_last_of('\n', out.size() - 2);
                     if (out.find("ctx.cr", lastLine + 1) == std::string::npos)
                         std::println("Instruction at {:X} has RC bit enabled but no comparison was generated", base - 4);
                 }
+#endif
             }
         }
 
