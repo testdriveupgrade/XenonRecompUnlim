@@ -13,12 +13,12 @@
 #define isnan __builtin_isnan
 #define __assume __builtin_assume
 #define __unreachable() __builtin_unreachable()
-#define PPC_FUNC extern "C" __attribute__((noinline))
 #else
 #include <intrin.h>
-#define PPC_FUNC extern "C" __declspec(noinline)
 #define __unreachable() __assume(0)
 #endif
+
+#define PPC_FUNC(x) extern "C" void x(PPCContext& __restrict ctx, uint8_t* base) noexcept
 
 #define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))
 #define PPC_LOAD_U16(x) _byteswap_ushort(*(uint16_t*)(base + (x)))
@@ -128,6 +128,28 @@ struct alignas(0x10) PPCVRegister
     };
 };
 
+struct CSRRegister
+{
+    uint32_t value;
+
+    void storeValue()
+    {
+        value = _mm_getcsr();
+    }
+
+    void setFlushMode(bool enable)
+    {
+        uint32_t mask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
+        uint32_t newValue = enable ? (value | mask) : (value & ~mask);
+        
+        if (value != newValue)
+        {
+            _mm_setcsr(newValue);
+            value = newValue;
+        }
+    }
+};
+
 struct PPCContext
 {
     PPCFunc** fn;
@@ -137,6 +159,7 @@ struct PPCContext
     PPCRegister reserved;
     uint32_t msr;
     uint32_t fpscr;
+    CSRRegister csr;
 
     union
     {
