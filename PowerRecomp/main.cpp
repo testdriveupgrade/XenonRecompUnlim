@@ -165,6 +165,7 @@ int main(int argc, char* argv[])
         else if (f.base == 0x82DE3708) f.size = 0x198;
         else if (f.base == 0x82DE38A0) f.size = 0x16C;
         else if (f.base == 0x830B7DD0) f.size = 0x74;
+        else if (f.base == 0x831B0BA0) f.size = 0xA0;
     };
 
     for (const auto& section : image.sections)
@@ -711,13 +712,13 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_DIVW:
-                    println("\tctx.r{}.s32 = ctx.r{}.s32 / ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = ctx.r{}.s32 / ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
 
                 case PPC_INST_DIVWU:
-                    println("\tctx.r{}.u32 = ctx.r{}.u32 / ctx.r{}.u32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u32 / ctx.r{}.u32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
@@ -759,7 +760,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_FCFID:
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.f64 = ctx.f{}.s64;", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.f64 = double(ctx.f{}.s64);", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCMPU:
@@ -769,17 +770,17 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_FCTID:
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.s64 = round(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s64 = int64_t(round(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCTIDZ:
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.s64 = trunc(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s64 = int64_t(trunc(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FCTIWZ:
                     println("\tctx.csr.setFlushMode(false);");
-                    println("\tctx.f{}.s32 = trunc(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+                    println("\tctx.f{}.s64 = int32_t(trunc(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
                     break;
 
                 case PPC_INST_FDIV:
@@ -897,7 +898,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_LBZU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tctx.r{}.u64 = PPC_LOAD_U8(ea);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_LBZX:
@@ -925,7 +926,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_LDU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tctx.r{}.u64 = PPC_LOAD_U64(ea);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_LDX:
@@ -936,6 +937,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_LFD:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\tctx.f{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
                     if (insn.operands[2] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[2]);
@@ -943,6 +945,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_LFDX:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\tctx.f{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
                     if (insn.operands[1] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -950,6 +953,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_LFS:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\ttemp.u32 = PPC_LOAD_U32(");
                     if (insn.operands[2] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[2]);
@@ -958,6 +962,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_LFSX:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\ttemp.u32 = PPC_LOAD_U32(");
                     if (insn.operands[1] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -1090,7 +1095,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_LWZU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tctx.r{}.u64 = PPC_LOAD_U32(ea);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_LWZX:
@@ -1166,11 +1171,11 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_MULHW:
-                    println("\tctx.r{}.s64 = int64_t(ctx.r{}.s32 * ctx.r{}.s32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = (int64_t(ctx.r{}.s32) * int64_t(ctx.r{}.s32)) >> 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULHWU:
-                    println("\tctx.r{}.u64 = uint64_t(ctx.r{}.u32 * ctx.r{}.u32) << 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = (uint64_t(ctx.r{}.u32) * uint64_t(ctx.r{}.u32)) >> 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_MULLD:
@@ -1182,7 +1187,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_MULLW:
-                    println("\tctx.r{}.s64 = ctx.r{}.s32 * ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.s64 = int64_t(ctx.r{}.s32) * int64_t(ctx.r{}.s32);", insn.operands[0], insn.operands[1], insn.operands[2]);
                     if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
@@ -1239,7 +1244,7 @@ int main(int argc, char* argv[])
 
                 case PPC_INST_RLDIMI:
                 {
-                    const uint64_t mask = computeMask(insn.operands[3], ~insn.operands[1]);
+                    const uint64_t mask = computeMask(insn.operands[3], ~insn.operands[2]);
                     println("\tctx.r{}.u64 = (_rotl64(ctx.r{}.u64, {}) & 0x{:X}) | (ctx.r{}.u64 & 0x{:X});", insn.operands[0], insn.operands[1], insn.operands[2], mask, insn.operands[0], ~mask);
                     break;
                 }
@@ -1272,11 +1277,11 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_SLD:
-                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x40 ? 0 : ctx.r{}.u64 << (ctx.r{}.u8 & 0x7F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x40 ? 0 : (ctx.r{}.u64 << (ctx.r{}.u8 & 0x7F));", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_SLW:
-                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : ctx.r{}.u32 << (ctx.r{}.u8 & 0x3F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : (ctx.r{}.u32 << (ctx.r{}.u8 & 0x3F));", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
                     if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
@@ -1310,11 +1315,11 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_SRD:
-                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x40 ? 0 : ctx.r{}.u64 >> (ctx.r{}.u8 & 0x7F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x40 ? 0 : (ctx.r{}.u64 >> (ctx.r{}.u8 & 0x7F));", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
                     break;
 
                 case PPC_INST_SRW:
-                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : ctx.r{}.u32 >> (ctx.r{}.u8 & 0x3F);", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
+                    println("\tctx.r{}.u64 = ctx.r{}.u8 & 0x20 ? 0 : (ctx.r{}.u32 >> (ctx.r{}.u8 & 0x3F));", insn.operands[0], insn.operands[2], insn.operands[1], insn.operands[2]);
                     if (strchr(insn.opcode->name, '.'))
                         println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
                     break;
@@ -1329,7 +1334,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_STBU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tPPC_STORE_U8(ea, ctx.r{}.u8);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STBX:
@@ -1360,7 +1365,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_STDU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tPPC_STORE_U64(ea, ctx.r{}.u64);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STDX:
@@ -1371,6 +1376,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_STFD:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\tPPC_STORE_U64(");
                     if (insn.operands[2] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[2]);
@@ -1378,6 +1384,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_STFDX:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\tPPC_STORE_U64(");
                     if (insn.operands[1] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -1385,6 +1392,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_STFIWX:
+                    println("\tctx.csr.setFlushMode(false);");
                     print("\tPPC_STORE_U32(");
                     if (insn.operands[1] != 0)
                         print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -1392,6 +1400,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_STFS:
+                    println("\tctx.csr.setFlushMode(false);");
                     println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
                     print("\tPPC_STORE_U32(");
                     if (insn.operands[2] != 0)
@@ -1400,6 +1409,7 @@ int main(int argc, char* argv[])
                     break;
 
                 case PPC_INST_STFSX:
+                    println("\tctx.csr.setFlushMode(false);");
                     println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
                     print("\tPPC_STORE_U32(");
                     if (insn.operands[1] != 0)
@@ -1511,7 +1521,7 @@ int main(int argc, char* argv[])
                 case PPC_INST_STWU:
                     println("\tea = {} + ctx.r{}.u32;", int32_t(insn.operands[1]), insn.operands[2]);
                     println("\tPPC_STORE_U32(ea, ctx.r{}.u32);", insn.operands[0]);
-                    println("\tctx.r{}.u64 = ea;", insn.operands[2]);
+                    println("\tctx.r{}.u32 = ea;", insn.operands[2]);
                     break;
 
                 case PPC_INST_STWUX:
@@ -1637,7 +1647,7 @@ int main(int argc, char* argv[])
                     const float v = ldexp(1.0f, -int32_t(insn.operands[2]));
 
                     println("\tctx.csr.setFlushMode(true);");
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castps_si128(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castsi128_ps(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
                     break;
                 }
 
@@ -1647,7 +1657,7 @@ int main(int argc, char* argv[])
                     const float v = ldexp(1.0f, -int32_t(insn.operands[2]));
 
                     println("\tctx.csr.setFlushMode(true);");
-                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps_(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castps_si128(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
+                    println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps_(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castsi128_ps(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
                     break;
                 }
 
@@ -1986,7 +1996,7 @@ int main(int argc, char* argv[])
                         for (size_t i = 0; i < 2; i++)
                         {
                             println("\ttemp.f32 = 3.0f;");
-                            //println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], i); // TODO: not sure about the indexing here
+                            println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], i); // TODO: not sure about the indexing here
                             println("\tvtemp.f32[{}] = temp.f32;", 3 - i);
                         }
                         println("\tvtemp.f32[1] = 0.0f;");
