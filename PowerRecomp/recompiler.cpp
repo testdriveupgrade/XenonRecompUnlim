@@ -407,147 +407,147 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_FABS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FADD:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FADDS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FCFID:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = double(ctx.f{}.s64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FCMPU:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.cr{}.compare(ctx.f{}.f64, ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FCTID:
-        println("\tctx.csr.setFlushMode(false);");
-        println("\tctx.f{}.s64 = int64_t(round(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+        println("\tctx.fpscr.setFlushMode(false);");
+        println("\tctx.f{}.s64 = _mm_cvtsd_si64(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FCTIDZ:
-        println("\tctx.csr.setFlushMode(false);");
-        println("\tctx.f{}.s64 = int64_t(trunc(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+        println("\tctx.fpscr.setFlushMode(false);");
+        println("\tctx.f{}.s64 = _mm_cvttsd_si64(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FCTIWZ:
-        println("\tctx.csr.setFlushMode(false);");
-        println("\tctx.f{}.s64 = int32_t(trunc(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+        println("\tctx.fpscr.setFlushMode(false);");
+        println("\tctx.f{}.s64 = _mm_cvttsd_si32(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FDIV:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 / ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FDIVS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64 / ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FMADD:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FMADDS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FMR:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FMSUB:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FMSUBS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FMUL:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 * ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FMULS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64 * ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FNABS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = -fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FNEG:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = -ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FNMADDS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(-(ctx.f{}.f64 * ctx.f{}.f64 + ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FNMSUB:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = -(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FNMSUBS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(-(ctx.f{}.f64 * ctx.f{}.f64 - ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FRES:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = 1.0f / float(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FRSP:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FSEL:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 >= 0.0 ? ctx.f{}.f64 : ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_FSQRT:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = sqrt(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FSQRTS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(sqrt(ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FSUB:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = ctx.f{}.f64 - ctx.f{}.f64;", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_FSUBS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\tctx.f{}.f64 = float(ctx.f{}.f64 - ctx.f{}.f64);", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
@@ -600,7 +600,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LFD:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\tctx.f{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
         if (insn.operands[2] != 0)
             print("ctx.r{}.u32 + ", insn.operands[2]);
@@ -608,7 +608,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LFDX:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\tctx.f{}.u64 = PPC_LOAD_U64(", insn.operands[0]);
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -616,7 +616,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LFS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\ttemp.u32 = PPC_LOAD_U32(");
         if (insn.operands[2] != 0)
             print("ctx.r{}.u32 + ", insn.operands[2]);
@@ -625,7 +625,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LFSX:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\ttemp.u32 = PPC_LOAD_U32(");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -777,7 +777,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_MFFS:
-        println("\tctx.f{}.u64 = ctx.fpscr;", insn.operands[0]);
+        println("\tctx.f{}.u64 = ctx.fpscr.loadFromHost();", insn.operands[0]);
         break;
 
     case PPC_INST_MFLR:
@@ -816,7 +816,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_MTFSF:
-        println("\tctx.fpscr = ctx.f{}.u32;", insn.operands[1]);
+        println("\tctx.fpscr.storeFromGuest(ctx.f{}.u32);", insn.operands[1]);
         break;
 
     case PPC_INST_MTLR:
@@ -1041,7 +1041,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_STFD:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\tPPC_STORE_U64(");
         if (insn.operands[2] != 0)
             print("ctx.r{}.u32 + ", insn.operands[2]);
@@ -1049,7 +1049,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_STFDX:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\tPPC_STORE_U64(");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -1057,7 +1057,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_STFIWX:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         print("\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
@@ -1065,7 +1065,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_STFS:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
         print("\tPPC_STORE_U32(");
         if (insn.operands[2] != 0)
@@ -1074,7 +1074,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_STFSX:
-        println("\tctx.csr.setFlushMode(false);");
+        println("\tctx.fpscr.setFlushMode(false);");
         println("\ttemp.f32 = ctx.f{}.f64;", insn.operands[0]);
         print("\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
@@ -1253,7 +1253,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VADDFP:
     case PPC_INST_VADDFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_add_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
@@ -1304,7 +1304,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VCTSXS:
     case PPC_INST_VCFPSXWS128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_vctsxs(_mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_set1_ps({}))));", insn.operands[0], insn.operands[1], 1u << insn.operands[2]);
         break;
 
@@ -1313,7 +1313,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     {
         const float v = ldexp(1.0f, -int32_t(insn.operands[2]));
 
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepi32_ps(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castsi128_ps(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
         break;
     }
@@ -1323,7 +1323,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     {
         const float v = ldexp(1.0f, -int32_t(insn.operands[2]));
 
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_cvtepu32_ps_(_mm_load_si128((__m128i*)ctx.v{}.u32)), _mm_castsi128_ps(_mm_set1_epi32(int(0x{:X})))));", insn.operands[0], insn.operands[1], *reinterpret_cast<const uint32_t*>(&v));
         break;
     }
@@ -1334,7 +1334,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VCMPEQFP:
     case PPC_INST_VCMPEQFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpeq_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
@@ -1355,7 +1355,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VCMPGEFP:
     case PPC_INST_VCMPGEFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpge_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
@@ -1363,7 +1363,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VCMPGTFP:
     case PPC_INST_VCMPGTFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpgt_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
@@ -1379,14 +1379,14 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VEXPTEFP128:
         // TODO: vectorize
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         for (size_t i = 0; i < 4; i++)
             println("\tctx.v{}.f32[{}] = exp2f(ctx.v{}.f32[{}]);", insn.operands[0], i, insn.operands[1], i);
         break;
 
     case PPC_INST_VLOGEFP128:
         // TODO: vectorize
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         for (size_t i = 0; i < 4; i++)
             println("\tctx.v{}.f32[{}] = log2f(ctx.v{}.f32[{}]);", insn.operands[0], i, insn.operands[1], i);
         break;
@@ -1394,13 +1394,13 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VMADDCFP128:
     case PPC_INST_VMADDFP:
     case PPC_INST_VMADDFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_fmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_VMAXFP:
     case PPC_INST_VMAXFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_max_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
@@ -1410,7 +1410,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VMINFP:
     case PPC_INST_VMINFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_min_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
@@ -1442,23 +1442,23 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VMSUM3FP128:
         // NOTE: accounting for full vector reversal here. should dot product yzw instead of xyz
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_dp_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), 0xEF));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_VMSUM4FP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_dp_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), 0xFF));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_VMULFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_VNMSUBFP:
     case PPC_INST_VNMSUBFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_fnmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
@@ -1487,7 +1487,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VPKD3D128:
         // TODO: vectorize somehow?
         // NOTE: handling vector reversal here too
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         switch (insn.operands[2])
         {
         case 0: // D3D color
@@ -1514,23 +1514,23 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VREFP:
     case PPC_INST_VREFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_rcp_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_VRFIM128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_round_ps(_mm_load_ps(ctx.v{}.f32), _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_VRFIN:
     case PPC_INST_VRFIN128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_round_ps(_mm_load_ps(ctx.v{}.f32), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_VRFIZ128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_round_ps(_mm_load_ps(ctx.v{}.f32), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC));", insn.operands[0], insn.operands[1]);
         break;
 
@@ -1543,7 +1543,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VRSQRTEFP:
     case PPC_INST_VRSQRTEFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_rsqrt_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
         break;
 
@@ -1623,7 +1623,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VSUBFP:
     case PPC_INST_VSUBFP128:
-        println("\tctx.csr.setFlushMode(true);");
+        println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_sub_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 

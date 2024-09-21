@@ -128,24 +128,32 @@ struct alignas(0x10) PPCVRegister
     };
 };
 
-struct CSRRegister
+struct PPCFPSCRRegister
 {
-    uint32_t value;
+    uint32_t csr;
 
-    void storeValue()
+    uint32_t loadFromHost()
     {
-        value = _mm_getcsr();
+        csr = _mm_getcsr();
+        return (0x6C >> ((csr & _MM_ROUND_MASK) >> 12)) & 3;
+    }
+        
+    void storeFromGuest(uint32_t value)
+    {
+        csr &= ~_MM_ROUND_MASK;
+        csr |= ((0x6C >> (2 * (value & 3))) & 3) << 13;
+        _mm_setcsr(csr);
     }
 
     void setFlushMode(bool enable)
     {
-        uint32_t mask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
-        uint32_t newValue = enable ? (value | mask) : (value & ~mask);
+        constexpr uint32_t mask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
+        uint32_t value = enable ? (csr | mask) : (csr & ~mask);
         
-        if (value != newValue)
+        if (csr != value)
         {
-            _mm_setcsr(newValue);
-            value = newValue;
+            _mm_setcsr(value);
+            csr = value;
         }
     }
 };
@@ -158,8 +166,7 @@ struct PPCContext
     PPCXERRegister xer;
     PPCRegister reserved;
     uint32_t msr;
-    uint32_t fpscr;
-    CSRRegister csr;
+    PPCFPSCRRegister fpscr;
 
     union
     {

@@ -132,7 +132,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                             std::println(file, "PPC_FUNC({});\n", symbol->second);
                             std::println(file, "void {}(uint8_t* base) {{", name);
                             std::println(file, "\tPPCContext ctx{{}};");
-                            std::println(file, "\tctx.csr.storeValue();");
+                            std::println(file, "\tctx.fpscr.loadFromGuest();");
 
                             while (getline() && !str.empty() && str[0] == '#')
                             {
