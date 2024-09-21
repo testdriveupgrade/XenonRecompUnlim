@@ -1395,7 +1395,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VMADDFP:
     case PPC_INST_VMADDFP128:
         println("\tctx.fpscr.setFlushMode(true);");
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_fmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+        println("\t_mm_store_ps(ctx.v{}.f32, _mm_add_ps(_mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_VMAXFP:
@@ -1812,7 +1812,7 @@ void Recompiler::Recompile(const char* directoryPath)
         println("\t{{ 0, nullptr }}");
         println("}};");
 
-        SaveCurrentOutData(directoryPath, "ppc_func_mapping.h");
+        SaveCurrentOutData(directoryPath, "ppc_func_mapping.cpp");
     }
 
     for (size_t i = 0; i < functions.size(); i++)
