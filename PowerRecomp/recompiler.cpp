@@ -368,16 +368,18 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_DIVDU:
         println("\tctx.r{}.u64 = ctx.r{}.u64 / ctx.r{}.u64;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
 
     case PPC_INST_DIVW:
-        println("\tctx.r{}.s64 = ctx.r{}.s32 / ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\tctx.r{}.s32 = ctx.r{}.s32 / ctx.r{}.s32;", insn.operands[0], insn.operands[1], insn.operands[2]);
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
 
     case PPC_INST_DIVWU:
-        println("\tctx.r{}.u64 = ctx.r{}.u32 / ctx.r{}.u32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\tctx.r{}.u32 = ctx.r{}.u32 / ctx.r{}.u32;", insn.operands[0], insn.operands[1], insn.operands[2]);
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
@@ -400,6 +402,8 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_EXTSW:
         println("\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
 
     case PPC_INST_FABS:
@@ -785,8 +789,8 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_MFOCRF:
-        println("\tctx.r{}.u64 = (ctx.cr{}.lt << 7) | (ctx.cr{}.gt << 6) | (ctx.cr{}.eq << 5) | (ctx.cr{}.so << 4);",
-            insn.operands[0], insn.operands[1], insn.operands[1], insn.operands[1], insn.operands[1]);
+        // TODO: don't hardcode to cr6
+        println("\tctx.r{}.u64 = (ctx.cr6.lt << 7) | (ctx.cr6.gt << 6) | (ctx.cr6.eq << 5) | (ctx.cr6.so << 4);", insn.operands[0]);
         break;
 
     case PPC_INST_MFTB:
@@ -835,6 +839,8 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_MULHWU:
         println("\tctx.r{}.u64 = (uint64_t(ctx.r{}.u32) * uint64_t(ctx.r{}.u32)) >> 32;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
 
     case PPC_INST_MULLD:
@@ -1212,6 +1218,8 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_SUBFE:
         // TODO: do we need to set the carry flag here?
         println("\tctx.r{}.u64 = ~ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
 
     case PPC_INST_SUBFIC:
@@ -1328,6 +1336,8 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VCMPEQFP128:
         println("\tctx.csr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_cmpeq_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.cr6.setFromMask(_mm_load_ps(ctx.v{}.f32), 0xF);", insn.operands[0]);
         break;
 
     case PPC_INST_VCMPEQUB:
@@ -1595,10 +1605,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     }
 
     case PPC_INST_VSR:
-        // TODO: vectorize
-        println("\ttemp.u64 = ctx.v{}.u8[15] & 0x7;", insn.operands[2]);
-        println("\tctx.v{}.u64[1] = (ctx.v{}.u64[0] << (64 - temp.u64)) | (ctx.v{}.u64[1] >> temp.u64);", insn.operands[0], insn.operands[1], insn.operands[1]);
-        println("\tctx.v{}.u64[0] = ctx.v{}.u64[0] >> temp.u64;", insn.operands[0], insn.operands[1]);
+        println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_vsr(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_VSRAW128:
@@ -1655,7 +1662,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
             for (size_t i = 0; i < 2; i++)
             {
                 println("\ttemp.f32 = 3.0f;");
-                println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], i); // TODO: not sure about the indexing here
+                println("\ttemp.s32 += ctx.v{}.s16[{}];", insn.operands[1], 1 - i);
                 println("\tvtemp.f32[{}] = temp.f32;", 3 - i);
             }
             println("\tvtemp.f32[1] = 0.0f;");
@@ -1710,19 +1717,19 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         return false;
     }
 
-#if 0
+#if 1
     if (strchr(insn.opcode->name, '.'))
     {
         int lastLine = out.find_last_of('\n', out.size() - 2);
         if (out.find("ctx.cr", lastLine + 1) == std::string::npos)
-            std::println("Instruction at {:X} has RC bit enabled but no comparison was generated", base - 4);
+            std::println("{} at {:X} has RC bit enabled but no comparison was generated", insn.opcode->name, base - 4);
     }
 #endif
     
     return true;
 }
 
-void Recompiler::Recompile(const Function& fn)
+bool Recompiler::Recompile(const Function& fn)
 {
     auto base = fn.base;
     auto end = base + fn.size;
@@ -1744,6 +1751,7 @@ void Recompiler::Recompile(const Function& fn)
     println("\tuint32_t ea;\n");
 
     auto switchTable = switchTables.end();
+    bool allRecompiled = true;
 
     ppc_insn insn;
     while (base < end)
@@ -1768,11 +1776,16 @@ void Recompiler::Recompile(const Function& fn)
         else
         {
             if (!Recompile(fn, base, insn, switchTable))
+            {
                 std::println("Unrecognized instruction at 0x{:X}: {}", base - 4, insn.opcode->name);
+                allRecompiled = false;
+            }
         }
     }
 
     println("}}\n");
+
+    return allRecompiled;
 }
 
 void Recompiler::Recompile(const char* directoryPath)

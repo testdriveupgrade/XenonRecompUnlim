@@ -10,5 +10,6 @@
 #include <print>
 #include <toml++/toml.hpp>
 #include <unordered_map>
+#include <unordered_set>
 #include <xbox.h>
 #include <xxhash.h>

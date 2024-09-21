@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "swa_recompiler.h"
+#include "test_recompiler.h"
 
 // argv 1: xex file path
 // argv 2: switches toml file path
@@ -7,18 +8,25 @@
 
 int main(int argc, char* argv[])
 {
-    SWARecompiler recompiler;
+    if (strstr(argv[1], ".xex") != nullptr)
+    {
+        SWARecompiler recompiler;
 
-    std::println("Loading executable...");
-    recompiler.LoadExecutable(argv[1]);
+        std::println("Loading executable...");
+        recompiler.LoadExecutable(argv[1]);
 
-    std::println("Loading switch tables...");
-    recompiler.LoadSwitchTables(argv[2]);
+        std::println("Loading switch tables...");
+        recompiler.LoadSwitchTables(argv[2]);
 
-    std::println("Analysing functions...");
-    recompiler.Analyse();
-    
-    recompiler.Recompile(argv[3]);
+        std::println("Analysing functions...");
+        recompiler.Analyse();
+
+        recompiler.Recompile(argv[3]);
+    }
+    else
+    {
+        TestRecompiler::RecompileTests(argv[1], argv[2]);
+    }
 
     return 0;
 }

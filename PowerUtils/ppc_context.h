@@ -533,3 +533,9 @@ inline __m128i _mm_vctsxs(__m128 a)
 
     return result;
 }
+
+inline __m128i _mm_vsr(__m128i a, __m128i b)
+{
+    b = _mm_srli_epi64(_mm_slli_epi64(b, 61), 61);
+    return _mm_castps_si128(_mm_insert_ps(_mm_castsi128_ps(_mm_srl_epi64(a, b)), _mm_castsi128_ps(_mm_srl_epi64(_mm_srli_si128(a, 4), b)), 0x10));
+}

@@ -34,7 +34,7 @@ struct Recompiler
 
     bool Recompile(const Function& fn, uint32_t base, const ppc_insn& insn, std::unordered_map<size_t, SwitchTable>::iterator& switchTable);
 
-    void Recompile(const Function& fn);
+    bool Recompile(const Function& fn);
 
     void Recompile(const char* directoryPath);
 

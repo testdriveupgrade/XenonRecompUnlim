@@ -80,7 +80,7 @@ Image ElfLoadImage(const uint8_t* data, size_t size)
     for (size_t i = 0; i < numSections; i++)
     {
         const auto& section = sections[i];
-        if (section.sh_type == 0 || section.sh_addr == 0)
+        if (section.sh_type == 0)
         {
             continue;
         }
