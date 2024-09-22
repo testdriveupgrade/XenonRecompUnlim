@@ -579,11 +579,11 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LDARX:
-        print("\tctx.reserved.u64 = PPC_LOAD_U64(");
+        print("\tctx.reserved.u64 = *(uint64_t*)(base + ");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
         println("ctx.r{}.u32);", insn.operands[2]);
-        println("\tctx.r{}.u64 = ctx.reserved.u64;", insn.operands[0]);
+        println("\tctx.r{}.u64 = __builtin_bswap64(ctx.reserved.u64);", insn.operands[0]);
         break;
 
     case PPC_INST_LDU:
@@ -723,11 +723,11 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LWARX:
-        print("\tctx.reserved.u32 = PPC_LOAD_U32(");
+        print("\tctx.reserved.u32 = *(uint32_t*)(base + ");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
         println("ctx.r{}.u32);", insn.operands[2]);
-        println("\tctx.r{}.u64 = ctx.reserved.u32;", insn.operands[0]);
+        println("\tctx.r{}.u64 = __builtin_bswap32(ctx.reserved.u32);", insn.operands[0]);
         break;
 
     case PPC_INST_LWAX:
@@ -1022,7 +1022,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         print("\tctx.cr0.eq = _InterlockedCompareExchange64(reinterpret_cast<__int64*>(base + ");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
-        println("ctx.r{}.u32), __builtin_bswap64(ctx.r{}.s64), __builtin_bswap64(ctx.reserved.s64)) == __builtin_bswap64(ctx.reserved.s64);",
+        println("ctx.r{}.u32), __builtin_bswap64(ctx.r{}.s64), ctx.reserved.s64) == ctx.reserved.s64;",
             insn.operands[2], insn.operands[0]);
         println("\tctx.cr0.so = ctx.xer.so;");
         break;
@@ -1178,7 +1178,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         print("\tctx.cr0.eq = _InterlockedCompareExchange(reinterpret_cast<long*>(base + ");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
-        println("ctx.r{}.u32), __builtin_bswap32(ctx.r{}.s32), __builtin_bswap32(ctx.reserved.s32)) == __builtin_bswap32(ctx.reserved.s32);",
+        println("ctx.r{}.u32), __builtin_bswap32(ctx.r{}.s32), ctx.reserved.s32) == ctx.reserved.s32;",
             insn.operands[2], insn.operands[0]);
         println("\tctx.cr0.so = ctx.xer.so;");
         break;
