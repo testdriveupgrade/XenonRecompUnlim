@@ -1572,7 +1572,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VSLW128:
         // TODO: vectorize, ensure endianness is correct
         for (size_t i = 0; i < 4; i++)
-            println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] << ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
+            println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] << (ctx.v{}.u8[{}] & 0x1F);", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
         break;
 
     case PPC_INST_VSPLTB:
@@ -1619,14 +1619,14 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VSRAW128:
         // TODO: vectorize, ensure endianness is correct
         for (size_t i = 0; i < 4; i++)
-            println("\tctx.v{}.s32[{}] = ctx.v{}.s32[{}] >> ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
+            println("\tctx.v{}.s32[{}] = ctx.v{}.s32[{}] >> (ctx.v{}.u8[{}] & 0x1F);", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
         break;
 
     case PPC_INST_VSRW:
     case PPC_INST_VSRW128:
         // TODO: vectorize, ensure endianness is correct
         for (size_t i = 0; i < 4; i++)
-            println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] >> ctx.v{}.u8[{}];", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
+            println("\tctx.v{}.u32[{}] = ctx.v{}.u32[{}] >> (ctx.v{}.u8[{}] & 0x1F);", insn.operands[0], i, insn.operands[1], i, insn.operands[2], i * 4);
         break;
 
     case PPC_INST_VSUBFP:
