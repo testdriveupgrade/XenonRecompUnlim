@@ -11,7 +11,7 @@ void Image::Map(const std::string_view& name, size_t base, uint32_t size, uint8_
 
 const void* Image::Find(size_t address) const
 {
-    const auto section = sections.find(address);
+    const auto section = sections.lower_bound(address);
     if (section == sections.end())
     {
         return nullptr;

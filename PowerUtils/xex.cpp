@@ -101,12 +101,13 @@ Image Xex2LoadImage(const uint8_t* data)
                 auto originalThunk = (XEX_THUNK_DATA*)image.Find(descriptors[im].FirstThunk);
                 auto thunkType = originalThunk->Function >> 24;
 
-                if (thunkType == 1)
+                if (thunkType != 0)
                 {
                     uint32_t thunk[4] = { 0x00000060, 0x00000060, 0x00000060, 0x2000804E };
                     memcpy(originalThunk, thunk, sizeof(thunk));
                 }
             }
+            library = (XEX_IMPORT_LIBRARY*)((char*)(library + 1) + library->NumberOfImports * sizeof(XEX_IMPORT_DESCRIPTOR));
         }
     }
 

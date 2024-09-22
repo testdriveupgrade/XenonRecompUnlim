@@ -1765,7 +1765,7 @@ bool Recompiler::Recompile(const Function& fn)
         if (insn.opcode == nullptr)
         {
             println("\t// {}", insn.op_str);
-#if 0
+#if 1
             if (*(data - 1) != 0)
                 std::println("Unable to decode instruction {:X} at {:X}", *(data - 1), base - 4);
 #endif

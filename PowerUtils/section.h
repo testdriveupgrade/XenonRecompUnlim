@@ -39,7 +39,7 @@ struct SectionComparer
 
     bool operator()(const Section& lhs, size_t rhs) const
     {
-        return rhs > lhs.base + lhs.size;
+        return lhs.base < rhs;
     }
 
     bool operator()(size_t lhs, const Section& rhs) const
@@ -49,6 +49,6 @@ struct SectionComparer
 
     bool operator()(const Section& lhs, const Section& rhs) const
     {
-        return (lhs.base + lhs.size) < rhs.base;
+        return lhs.base < rhs.base;
     }
 };

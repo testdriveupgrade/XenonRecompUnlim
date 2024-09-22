@@ -163,6 +163,11 @@ void SWARecompiler::Analyse()
                 continue;
             }
 
+            if (*(uint32_t*)data == 0x45564800)
+            {
+                break;
+            }
+
             auto fnSymbol = image.symbols.find(base);
             if (fnSymbol != image.symbols.end() && fnSymbol->address == base && fnSymbol->type == Symbol_Function)
             {
