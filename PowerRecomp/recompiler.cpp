@@ -1745,10 +1745,7 @@ bool Recompiler::Recompile(const Function& fn)
         println("PPC_FUNC(sub_{}) {{", fn.base);
     }
 
-    println("\t__assume((reinterpret_cast<size_t>(base) & 0xFFFFFFFF) == 0);");
-    println("\tPPCRegister temp;");
-    println("\tPPCVRegister vtemp;");
-    println("\tuint32_t ea;\n");
+    println("\tPPC_FUNC_PROLOGUE();");
 
     auto switchTable = switchTables.end();
     bool allRecompiled = true;
@@ -1817,13 +1814,13 @@ void Recompiler::Recompile(const char* directoryPath)
 
     for (size_t i = 0; i < functions.size(); i++)
     {
-        if ((i % 100) == 0)
+        if ((i % 256) == 0)
         {
             SaveCurrentOutData(directoryPath);
             println("#include \"ppc_recomp_shared.h\"\n");
         }
 
-        if ((i % 2000) == 0 || (i == (functions.size() - 1)))
+        if ((i % 2048) == 0 || (i == (functions.size() - 1)))
             std::println("Recompiling functions... {}%", static_cast<float>(i + 1) / functions.size() * 100.0f);
 
         Recompile(functions[i]);

@@ -20,6 +20,12 @@
 
 #define PPC_FUNC(x) extern "C" void x(PPCContext& __restrict ctx, uint8_t* base) noexcept
 
+#define PPC_FUNC_PROLOGUE() \
+	__assume((reinterpret_cast<size_t>(base) & 0xFFFFFFFF) == 0); \
+    PPCRegister temp; \
+    PPCVRegister vtemp; \
+    uint32_t ea
+
 #define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))
 #define PPC_LOAD_U16(x) _byteswap_ushort(*(uint16_t*)(base + (x)))
 #define PPC_LOAD_U32(x) _byteswap_ulong(*(uint32_t*)(base + (x)))

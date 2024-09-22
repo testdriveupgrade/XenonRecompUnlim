@@ -115,6 +115,7 @@ void SWARecompiler::Analyse()
             else if (f.base == 0x82DE38A0) f.size = 0x16C;
             else if (f.base == 0x830B7DD0) f.size = 0x74;
             else if (f.base == 0x831B0BA0) f.size = 0xA0;
+            else if (f.base == 0x8305D168) f.size = 0x278;
         };
 
     for (const auto& section : image.sections)
@@ -145,7 +146,6 @@ void SWARecompiler::Analyse()
         }
 
         data = section.data;
-        const Symbol* prevSymbol = nullptr;
 
         while (data < dataEnd)
         {
@@ -168,7 +168,6 @@ void SWARecompiler::Analyse()
             {
                 assert(fnSymbol->address == base);
 
-                prevSymbol = &*fnSymbol;
                 base += fnSymbol->size;
                 data += fnSymbol->size;
             }
