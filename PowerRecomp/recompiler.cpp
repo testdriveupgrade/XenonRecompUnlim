@@ -168,7 +168,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
             }
 
             println("\tdefault:");
-            println("\t\t__unreachable();");
+            println("\t\t__builtin_unreachable();");
             println("\t}}");
 
             switchTable = switchTables.end();
@@ -738,7 +738,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_LWBRX:
-        print("\tctx.r{}.u64 = _byteswap_ulong(PPC_LOAD_U32(", insn.operands[0]);
+        print("\tctx.r{}.u64 = __builtin_bswap32(PPC_LOAD_U32(", insn.operands[0]);
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
         println("ctx.r{}.u32));", insn.operands[2]);
@@ -1022,7 +1022,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         print("\tctx.cr0.eq = _InterlockedCompareExchange64(reinterpret_cast<__int64*>(base + ");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
-        println("ctx.r{}.u32), _byteswap_uint64(ctx.r{}.s64), _byteswap_uint64(ctx.reserved.s64)) == _byteswap_uint64(ctx.reserved.s64);",
+        println("ctx.r{}.u32), __builtin_bswap64(ctx.r{}.s64), __builtin_bswap64(ctx.reserved.s64)) == __builtin_bswap64(ctx.reserved.s64);",
             insn.operands[2], insn.operands[0]);
         println("\tctx.cr0.so = ctx.xer.so;");
         break;
@@ -1093,7 +1093,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         print("\tPPC_STORE_U16(");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
-        println("ctx.r{}.u32, _byteswap_ushort(ctx.r{}.u16));", insn.operands[2], insn.operands[0]);
+        println("ctx.r{}.u32, __builtin_bswap16(ctx.r{}.u16));", insn.operands[2], insn.operands[0]);
         break;
 
     case PPC_INST_STHX:
@@ -1169,7 +1169,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         print("\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
-        println("ctx.r{}.u32, _byteswap_ulong(ctx.r{}.u32));", insn.operands[2], insn.operands[0]);
+        println("ctx.r{}.u32, __builtin_bswap32(ctx.r{}.u32));", insn.operands[2], insn.operands[0]);
         break;
 
     case PPC_INST_STWCX:
@@ -1178,7 +1178,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         print("\tctx.cr0.eq = _InterlockedCompareExchange(reinterpret_cast<long*>(base + ");
         if (insn.operands[1] != 0)
             print("ctx.r{}.u32 + ", insn.operands[1]);
-        println("ctx.r{}.u32), _byteswap_ulong(ctx.r{}.s32), _byteswap_ulong(ctx.reserved.s32)) == _byteswap_ulong(ctx.reserved.s32);",
+        println("ctx.r{}.u32), __builtin_bswap32(ctx.r{}.s32), __builtin_bswap32(ctx.reserved.s32)) == __builtin_bswap32(ctx.reserved.s32);",
             insn.operands[2], insn.operands[0]);
         println("\tctx.cr0.so = ctx.xer.so;");
         break;
@@ -1228,7 +1228,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_SYNC:
-        println("\t__faststorefence();");
+        // no op
         break;
 
     case PPC_INST_TDLGEI:
@@ -1328,6 +1328,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
     }
 
+    case PPC_INST_VCMPBFP:
     case PPC_INST_VCMPBFP128:
         println("\t__debugbreak();");
         break;
@@ -1377,6 +1378,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_cmpgt_epu16(_mm_load_si128((__m128i*)ctx.v{}.u16), _mm_load_si128((__m128i*)ctx.v{}.u16)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
+    case PPC_INST_VEXPTEFP:
     case PPC_INST_VEXPTEFP128:
         // TODO: vectorize
         println("\tctx.fpscr.setFlushMode(true);");
@@ -1384,6 +1386,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
             println("\tctx.v{}.f32[{}] = exp2f(ctx.v{}.f32[{}]);", insn.operands[0], i, insn.operands[1], i);
         break;
 
+    case PPC_INST_VLOGEFP:
     case PPC_INST_VLOGEFP128:
         // TODO: vectorize
         println("\tctx.fpscr.setFlushMode(true);");
@@ -1509,6 +1512,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_VPKSHUS:
+    case PPC_INST_VPKSHUS128:
         println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_packus_epi16(_mm_load_si128((__m128i*)ctx.v{}.s16), _mm_load_si128((__m128i*)ctx.v{}.s16)));", insn.operands[0], insn.operands[2], insn.operands[1]);
         break;
 
@@ -1518,6 +1522,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_rcp_ps(_mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1]);
         break;
 
+    case PPC_INST_VRFIM:
     case PPC_INST_VRFIM128:
         println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_round_ps(_mm_load_ps(ctx.v{}.f32), _MM_FROUND_TO_NEG_INF | _MM_FROUND_NO_EXC));", insn.operands[0], insn.operands[1]);
@@ -1529,6 +1534,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_round_ps(_mm_load_ps(ctx.v{}.f32), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));", insn.operands[0], insn.operands[1]);
         break;
 
+    case PPC_INST_VRFIZ:
     case PPC_INST_VRFIZ128:
         println("\tctx.fpscr.setFlushMode(true);");
         println("\t_mm_store_ps(ctx.v{}.f32, _mm_round_ps(_mm_load_ps(ctx.v{}.f32), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC));", insn.operands[0], insn.operands[1]);
@@ -1562,6 +1568,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_alignr_epi8(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8), {}));", insn.operands[0], insn.operands[1], insn.operands[2], 16 - insn.operands[3]);
         break;
 
+    case PPC_INST_VSLW:
     case PPC_INST_VSLW128:
         // TODO: vectorize, ensure endianness is correct
         for (size_t i = 0; i < 4; i++)
@@ -1608,6 +1615,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_vsr(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
+    case PPC_INST_VSRAW:
     case PPC_INST_VSRAW128:
         // TODO: vectorize, ensure endianness is correct
         for (size_t i = 0; i < 4; i++)
@@ -1676,6 +1684,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         }
         break;
 
+    case PPC_INST_VUPKHSB:
     case PPC_INST_VUPKHSB128:
         println("\t_mm_store_si128((__m128i*)ctx.v{}.s16, _mm_cvtepi8_epi16(_mm_unpackhi_epi64(_mm_load_si128((__m128i*)ctx.v{}.s8), _mm_load_si128((__m128i*)ctx.v{}.s8))));", insn.operands[0], insn.operands[1], insn.operands[1]);
         break;
@@ -1685,6 +1694,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_cvtepi16_epi32(_mm_unpackhi_epi64(_mm_load_si128((__m128i*)ctx.v{}.s16), _mm_load_si128((__m128i*)ctx.v{}.s16))));", insn.operands[0], insn.operands[1], insn.operands[1]);
         break;
 
+    case PPC_INST_VUPKLSB:
     case PPC_INST_VUPKLSB128:
         println("\t_mm_store_si128((__m128i*)ctx.v{}.s32, _mm_cvtepi8_epi16(_mm_load_si128((__m128i*)ctx.v{}.s16)));", insn.operands[0], insn.operands[1]);
         break;
@@ -1779,6 +1789,11 @@ bool Recompiler::Recompile(const Function& fn)
             }
         }
     }
+
+#if 0
+    if (insn.opcode == nullptr || (insn.opcode->id != PPC_INST_B && insn.opcode->id != PPC_INST_BCTR && insn.opcode->id != PPC_INST_BLR))
+        std::println("Function at {:X} ends prematurely with instruction {} at {:X}", fn.base, insn.opcode != nullptr ? insn.opcode->name : "INVALID", base - 4);
+#endif
 
     println("}}\n");
 

@@ -98,8 +98,8 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
     std::println(file, "#include <ppc_context.h>");
     std::println(file, "#include <Windows.h>");
     std::println(file, "#include <print>\n");
-    std::println(file, "#define PPC_CHECK_VALUE_U(lhs, rhs) if (lhs != rhs) std::println(__FUNCTION__ \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{:X}}\", lhs)\n");
-    std::println(file, "#define PPC_CHECK_VALUE_F(lhs, rhs) if (lhs != rhs) std::println(__FUNCTION__ \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{}}\", lhs)\n");
+    std::println(file, "#define PPC_CHECK_VALUE_U(f, lhs, rhs) if (lhs != rhs) std::println(#f \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{:X}}\", lhs)\n");
+    std::println(file, "#define PPC_CHECK_VALUE_F(f, lhs, rhs) if (lhs != rhs) std::println(#f \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{}}\", lhs)\n");
 
     for (auto& [fn, addr] : functions)
     {
@@ -212,15 +212,16 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                             int commaIndex2 = str.find(',', commaIndex1 + 1);
                                             int closingBracketIndex = str.find(']', commaIndex2 + 1);
 
-                                            std::println(file, "\tPPC_CHECK_VALUE_U(ctx.{}.u32[3], 0x{});", reg, str.substr(openingBracketIndex + 1, commaIndex0 - openingBracketIndex - 1));
-                                            std::println(file, "\tPPC_CHECK_VALUE_U(ctx.{}.u32[2], 0x{});", reg, str.substr(commaIndex0 + 2, commaIndex1 - commaIndex0 - 2));
-                                            std::println(file, "\tPPC_CHECK_VALUE_U(ctx.{}.u32[1], 0x{});", reg, str.substr(commaIndex1 + 2, commaIndex2 - commaIndex1 - 2));
-                                            std::println(file, "\tPPC_CHECK_VALUE_U(ctx.{}.u32[0], 0x{});", reg, str.substr(commaIndex2 + 2, closingBracketIndex - commaIndex2 - 2));
+                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[3], 0x{});", name, reg, str.substr(openingBracketIndex + 1, commaIndex0 - openingBracketIndex - 1));
+                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[2], 0x{});", name, reg, str.substr(commaIndex0 + 2, commaIndex1 - commaIndex0 - 2));
+                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[1], 0x{});", name, reg, str.substr(commaIndex1 + 2, commaIndex2 - commaIndex1 - 2));
+                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[0], 0x{});", name, reg, str.substr(commaIndex2 + 2, closingBracketIndex - commaIndex2 - 2));
                                         }
                                         else
                                         {
-                                            std::println(file, "\tPPC_CHECK_VALUE_{}(ctx.{}.{}64, {});",
+                                            std::println(file, "\tPPC_CHECK_VALUE_{}({}, ctx.{}.{}64, {});",
                                                 str.find('.', secondSpaceIndex) != std::string::npos ? 'F' : 'U',
+                                                name,
                                                 reg,
                                                 str.find('.', secondSpaceIndex) != std::string::npos ? 'f' : 'u',
                                                 str.substr(secondSpaceIndex + 1));
@@ -238,7 +239,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                             {
                                                 if (str[i] != ' ')
                                                 {
-                                                    std::println(file, "\tPPC_CHECK_VALUE_U(base[0x{} + 0x{:X}], 0x{}{});", address, j, str[i], str[i + 1]);
+                                                    std::println(file, "\tPPC_CHECK_VALUE_U({}, base[0x{} + 0x{:X}], 0x{}{});", name, address, j, str[i], str[i + 1]);
                                                     ++i; // the loop adds another
                                                     ++j;
                                                 }
@@ -266,9 +267,10 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
         }
     }
 
-    std::println(file, "void main() {{");
+    std::println(file, "int main() {{");
     std::println(file, "\tuint8_t* base = reinterpret_cast<uint8_t*>(VirtualAlloc(nullptr, 0x100000000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));");
     fwrite(main.data(), 1, main.size(), file);
+    std::println(file, "\treturn 0;");
     std::println(file, "}}");
 
     fclose(file);

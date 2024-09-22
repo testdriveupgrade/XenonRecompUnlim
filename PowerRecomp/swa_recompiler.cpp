@@ -72,9 +72,10 @@ void SWARecompiler::Analyse()
         }
     }
 
-    auto hardcodedFuncCheck = [&](Function& f)
+    auto hardcodedFuncCheck = [&](uint8_t* data, Function& f)
         {
-            if (f.base == 0x824E7EF0) f.size = 0x98;
+            if (*(uint32_t*)(data + 4) == 0x04000048) f.size = 0x8; // shifted ptr tail call
+            else if (f.base == 0x824E7EF0) f.size = 0x98;
             else if (f.base == 0x824E7F28) f.size = 0x60;
             else if (f.base == 0x82C980E8) f.size = 0x110;
             else if (f.base == 0x82CF7080) f.size = 0x80;
@@ -137,8 +138,9 @@ void SWARecompiler::Analyse()
 
                 if (address >= section.base && address < section.base + section.size && image.symbols.find(address) == image.symbols.end())
                 {
-                    auto& fn = functions.emplace_back(Function::Analyze(section.data + address - section.base, section.base + section.size - address, address));
-                    hardcodedFuncCheck(fn);
+                    auto data = section.data + address - section.base;
+                    auto& fn = functions.emplace_back(Function::Analyze(data, section.base + section.size - address, address));
+                    hardcodedFuncCheck(data, fn);
                     image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
                 }
             }
@@ -179,7 +181,7 @@ void SWARecompiler::Analyse()
             else
             {
                 auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
-                hardcodedFuncCheck(fn);
+                hardcodedFuncCheck(data, fn);
                 image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
 
                 base += fn.size;
