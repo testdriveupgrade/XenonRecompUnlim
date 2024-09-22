@@ -1,7 +1,8 @@
 project("PowerSample")
 
 add_compile_options(
-    "-march=x86-64-v3"
+    "/arch:AVX"
+    "/fp:strict"
     "-Wno-unused-label"
     "-Wno-unused-variable")
 

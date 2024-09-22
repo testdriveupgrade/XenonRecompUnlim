@@ -1283,11 +1283,11 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VAND:
     case PPC_INST_VAND128:
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_and_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_and_si128(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_VANDC128:
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_andnot_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[2], insn.operands[1]);
+        println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_andnot_si128(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[2], insn.operands[1]);
         break;
 
     case PPC_INST_VAVGSB:
@@ -1462,12 +1462,12 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     case PPC_INST_VNMSUBFP:
     case PPC_INST_VNMSUBFP128:
         println("\tctx.fpscr.setFlushMode(true);");
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_fnmadd_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
+        println("\t_mm_store_ps(ctx.v{}.f32, _mm_xor_ps(_mm_sub_ps(_mm_mul_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)), _mm_load_ps(ctx.v{}.f32)), _mm_castsi128_ps(_mm_set1_epi32(int(0x80000000)))));", insn.operands[0], insn.operands[1], insn.operands[2], insn.operands[3]);
         break;
 
     case PPC_INST_VOR:
     case PPC_INST_VOR128:
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_or_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_or_si128(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_VPERM:
@@ -1554,7 +1554,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_VSEL:
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_or_ps(_mm_andnot_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)), _mm_and_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32))));", insn.operands[0], insn.operands[3], insn.operands[1], insn.operands[3], insn.operands[2]);
+        println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_or_si128(_mm_andnot_si128(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)), _mm_and_si128(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8))));", insn.operands[0], insn.operands[3], insn.operands[1], insn.operands[3], insn.operands[2]);
         break;
 
     case PPC_INST_VSLB:
@@ -1706,7 +1706,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_VXOR:
     case PPC_INST_VXOR128:
-        println("\t_mm_store_ps(ctx.v{}.f32, _mm_xor_ps(_mm_load_ps(ctx.v{}.f32), _mm_load_ps(ctx.v{}.f32)));", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\t_mm_store_si128((__m128i*)ctx.v{}.u8, _mm_xor_si128(_mm_load_si128((__m128i*)ctx.v{}.u8), _mm_load_si128((__m128i*)ctx.v{}.u8)));", insn.operands[0], insn.operands[1], insn.operands[2]);
         break;
 
     case PPC_INST_XOR:

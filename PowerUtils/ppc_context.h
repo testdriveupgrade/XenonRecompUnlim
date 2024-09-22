@@ -461,7 +461,7 @@ inline uint8_t VectorShiftTableR[] =
 
 inline __m128i _mm_adds_epu32(__m128i a, __m128i b) 
 {
-    return _mm_add_epi32(_mm_min_epu32(a, _mm_xor_si128(b, _mm_cmpeq_epi32(b, b))), b);
+    return _mm_add_epi32(a, _mm_min_epu32(_mm_xor_si128(a, _mm_cmpeq_epi32(a, a)), b));
 }
 
 inline __m128i _mm_avg_epi8(__m128i a, __m128i b)
@@ -476,13 +476,16 @@ inline __m128i _mm_avg_epi16(__m128i a, __m128i b)
     return _mm_xor_si128(c, _mm_avg_epu16(_mm_xor_si128(c, a), _mm_xor_si128(c, b)));
 }
 
-inline __m128 _mm_cvtepu32_ps_(__m128i v)
+inline __m128 _mm_cvtepu32_ps_(__m128i src1)
 {
-    __m128i v2 = _mm_srli_epi32(v, 1);
-    __m128i v1 = _mm_sub_epi32(v, v2);
-    __m128 v2f = _mm_cvtepi32_ps(v2);
-    __m128 v1f = _mm_cvtepi32_ps(v1);
-    return _mm_add_ps(v2f, v1f);
+    __m128i xmm1 = _mm_add_epi32(src1, _mm_set1_epi32(127));
+    __m128i xmm0 = _mm_slli_epi32(src1, 31 - 8);
+    xmm0 = _mm_srli_epi32(xmm0, 31);
+    xmm0 = _mm_add_epi32(xmm0, xmm1);
+    xmm0 = _mm_srai_epi32(xmm0, 8);
+    xmm0 = _mm_add_epi32(xmm0, _mm_set1_epi32(0x4F800000));
+    __m128 xmm2 = _mm_cvtepi32_ps(src1);
+    return _mm_blendv_ps(xmm2, _mm_castsi128_ps(xmm0), _mm_castsi128_ps(src1));
 }
 
 inline __m128i _mm_perm_epi8_(__m128i a, __m128i b, __m128i c)
@@ -504,19 +507,14 @@ inline __m128i _mm_cmpgt_epu16(__m128i a, __m128i b)
     return _mm_cmpgt_epi16(_mm_xor_si128(a, c), _mm_xor_si128(b, c));
 }
 
-inline __m128i _mm_vctsxs(__m128 a)
+inline __m128i _mm_vctsxs(__m128 src1)
 {
-    __m128i result = _mm_cvttps_epi32(a);
-
-    __m128 max_val = _mm_set1_ps(2147483648.0f);
-    __m128 cmp_mask = _mm_cmpgt_ps(a, max_val);
-
-    result = _mm_xor_si128(result, _mm_castps_si128(cmp_mask));
-
-    __m128 ord_mask = _mm_cmpord_ps(a, a);
-    result = _mm_and_si128(result, _mm_castps_si128(ord_mask));
-
-    return result;
+    __m128 xmm2 = _mm_cmpunord_ps(src1, src1);
+    __m128i xmm0 = _mm_cvttps_epi32(src1);
+    __m128i xmm1 = _mm_cmpeq_epi32(xmm0, _mm_set1_epi32(INT_MIN));
+    xmm1 = _mm_andnot_si128(_mm_castps_si128(src1), xmm1);
+    __m128 dest = _mm_blendv_ps(_mm_castsi128_ps(xmm0), _mm_castsi128_ps(_mm_set1_epi32(INT_MAX)), _mm_castsi128_ps(xmm1));
+    return _mm_andnot_si128(_mm_castps_si128(xmm2), _mm_castps_si128(dest));
 }
 
 inline __m128i _mm_vsr(__m128i a, __m128i b)
