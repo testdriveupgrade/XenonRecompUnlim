@@ -408,7 +408,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_FABS:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.f64 = fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.u64 = ctx.f{}.u64 & ~0x8000000000000000;", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FADD:
@@ -493,12 +493,12 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_FNABS:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.f64 = -fabs(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.u64 = ctx.f{}.u64 | 0x8000000000000000;", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FNEG:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.f64 = -ctx.f{}.f64;", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.u64 = ctx.f{}.u64 ^ 0x8000000000000000;", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FNMADDS:
