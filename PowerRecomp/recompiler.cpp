@@ -1780,6 +1780,9 @@ bool Recompiler::Recompile(const Function& fn)
         }
         else
         {
+            if (insn.opcode->id == PPC_INST_BCTR && (*(data - 1) == 0x07008038 || *(data - 1) == 0x00000060) && switchTable == switchTables.end())
+                std::println("Found a switch jump table at {:X} with no switch table entry present", base);
+
             if (!Recompile(fn, base, insn, switchTable))
             {
                 std::println("Unrecognized instruction at 0x{:X}: {}", base, insn.opcode->name);
