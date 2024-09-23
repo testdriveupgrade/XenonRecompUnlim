@@ -433,17 +433,17 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_FCTID:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.s64 = _mm_cvtsd_si64(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.s64 = (ctx.f{}.f64 > double(LLONG_MAX)) ? LLONG_MAX : _mm_cvtsd_si64(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[1]);
         break;
 
     case PPC_INST_FCTIDZ:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.s64 = _mm_cvttsd_si64(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.s64 = (ctx.f{}.f64 > double(LLONG_MAX)) ? LLONG_MAX : _mm_cvttsd_si64(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[1]);
         break;
 
     case PPC_INST_FCTIWZ:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.s64 = _mm_cvttsd_si32(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.s64 = (ctx.f{}.f64 > double(INT_MAX)) ? INT_MAX : _mm_cvttsd_si32(_mm_load1_pd(&ctx.f{}.f64));", insn.operands[0], insn.operands[1], insn.operands[1]);
         break;
 
     case PPC_INST_FDIV:
@@ -518,7 +518,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 
     case PPC_INST_FRES:
         println("\tctx.fpscr.setFlushMode(false);");
-        println("\tctx.f{}.f64 = 1.0f / float(ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
+        println("\tctx.f{}.f64 = float(1.0 / ctx.f{}.f64);", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_FRSP:
