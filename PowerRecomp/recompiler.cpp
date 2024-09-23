@@ -158,7 +158,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
                 if (label < fn.base || label >= fn.base + fn.size)
                 {
                     println("\t\t// ERROR: 0x{:X}", label);
-                    std::println("ERROR: Switch case at {:X} is trying to jump outside function: {:X}", base - 4, label);
+                    std::println("ERROR: Switch case at {:X} is trying to jump outside function: {:X}", base, label);
                     println("\t\treturn;");
                 }
                 else
@@ -181,7 +181,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_BCTRL:
-        println("\tctx.lr = 0x{:X};", base);
+        println("\tctx.lr = 0x{:X};", base + 4);
         println("\tctx.fn[ctx.ctr.u32 / 4](ctx, base);");
         break;
 
@@ -231,7 +231,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_BL:
-        println("\tctx.lr = 0x{:X};", base);
+        println("\tctx.lr = 0x{:X};", base + 4);
         printFunctionCall(insn.operands[0]);
         break;
 
@@ -1495,7 +1495,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         {
         case 0: // D3D color
             if (insn.operands[3] != 1 || insn.operands[4] != 3)
-                std::println("Unexpected D3D color pack instruction at {:X}", base - 4);
+                std::println("Unexpected D3D color pack instruction at {:X}", base);
 
             for (size_t i = 0; i < 4; i++)
             {
@@ -1732,7 +1732,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     {
         int lastLine = out.find_last_of('\n', out.size() - 2);
         if (out.find("ctx.cr", lastLine + 1) == std::string::npos)
-            std::println("{} at {:X} has RC bit enabled but no comparison was generated", insn.opcode->name, base - 4);
+            std::println("{} at {:X} has RC bit enabled but no comparison was generated", insn.opcode->name, base);
     }
 #endif
     
@@ -1770,24 +1770,25 @@ bool Recompiler::Recompile(const Function& fn)
 
         ppc::Disassemble(data, 4, base, insn);
 
-        base += 4;
-        ++data;
         if (insn.opcode == nullptr)
         {
             println("\t// {}", insn.op_str);
 #if 1
-            if (*(data - 1) != 0)
-                std::println("Unable to decode instruction {:X} at {:X}", *(data - 1), base - 4);
+            if (*data != 0)
+                std::println("Unable to decode instruction {:X} at {:X}", *data, base);
 #endif
         }
         else
         {
             if (!Recompile(fn, base, insn, switchTable))
             {
-                std::println("Unrecognized instruction at 0x{:X}: {}", base - 4, insn.opcode->name);
+                std::println("Unrecognized instruction at 0x{:X}: {}", base, insn.opcode->name);
                 allRecompiled = false;
             }
         }
+
+        base += 4;
+        ++data;
     }
 
 #if 0
