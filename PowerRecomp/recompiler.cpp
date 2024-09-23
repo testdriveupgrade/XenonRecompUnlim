@@ -79,6 +79,13 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
 
+    case PPC_INST_ADDE:
+        // TODO: set carry flag
+        println("\tctx.r{}.u64 = ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
+        break;
+
     case PPC_INST_ADDI:
         print("\tctx.r{}.s64 = ", insn.operands[0]);
         if (insn.operands[1] != 0)
@@ -955,7 +962,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\ttemp.u64 = ctx.r{}.u64 & 0x7F;", insn.operands[2]);
         println("\tif (temp.u64 > 0x3F) temp.u64 = 0x3F;");
         println("\tctx.xer.ca = (ctx.r{}.s64 < 0) & (((ctx.r{}.s64 >> temp.u64) << temp.u64) != ctx.r{}.s64);", insn.operands[1], insn.operands[1], insn.operands[1]);
-        println("\tctx.r{}.s64 = ctx.r{}.s64 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\tctx.r{}.s64 = ctx.r{}.s64 >> temp.u64;", insn.operands[0], insn.operands[1]);
         break;
 
     case PPC_INST_SRADI:
@@ -967,7 +974,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         println("\ttemp.u32 = ctx.r{}.u32 & 0x3F;", insn.operands[2]);
         println("\tif (temp.u32 > 0x1F) temp.u32 = 0x1F;");
         println("\tctx.xer.ca = (ctx.r{}.s32 < 0) & (((ctx.r{}.s32 >> temp.u32) << temp.u32) != ctx.r{}.s32);", insn.operands[1], insn.operands[1], insn.operands[1]);
-        println("\tctx.r{}.s64 = ctx.r{}.s32 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\tctx.r{}.s64 = ctx.r{}.s32 >> temp.u32;", insn.operands[0], insn.operands[1]);
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
