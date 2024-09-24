@@ -2,6 +2,20 @@
 #include "image.h"
 #include <cassert>
 #include <vector>
+#include <unordered_map>
+
+#define STRINGIFY(X) #X
+#define XE_EXPORT(MODULE, ORDINAL, NAME, TYPE) { (ORDINAL), STRINGIFY(NAME) }
+
+std::unordered_map<size_t, const char*> XamExports = 
+{
+    #include "xbox/xam_table.inc"
+};
+
+std::unordered_map<size_t, const char*> XboxKernelExports =
+{
+    #include "xbox/xboxkrnl_table.inc"
+};
 
 Image Xex2LoadImage(const uint8_t* data)
 {
@@ -96,6 +110,18 @@ Image Xex2LoadImage(const uint8_t* data)
         for (size_t i = 0; i < stringTable.size(); i++)
         {
             auto* descriptors = (XEX_IMPORT_DESCRIPTOR*)(library + 1);
+            static std::unordered_map<size_t, const char*> DummyExports;
+            const std::unordered_map<size_t, const char*>* names = &DummyExports;
+
+            if (stringTable[i] == "xam.xex")
+            {
+                names = &XamExports;
+            }
+            else if (stringTable[i] == "xboxkrnl.exe")
+            {
+                names = &XboxKernelExports;
+            }
+
             for (size_t im = 0; im < library->NumberOfImports; im++)
             {
                 auto originalThunk = (XEX_THUNK_DATA*)image.Find(descriptors[im].FirstThunk);
@@ -104,6 +130,12 @@ Image Xex2LoadImage(const uint8_t* data)
                 if (thunkType != 0)
                 {
                     uint32_t thunk[4] = { 0x00000060, 0x00000060, 0x00000060, 0x2000804E };
+                    auto name = names->find(originalThunk->OriginalData.Ordinal);
+                    if (name != names->end())
+                    {
+                        image.symbols.emplace(name->second, descriptors[im].FirstThunk, sizeof(thunk), Symbol_Function);
+                    }
+
                     memcpy(originalThunk, thunk, sizeof(thunk));
                 }
             }
