@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <csetjmp>
 
 #ifdef __clang__
 #include <x86intrin.h>
@@ -17,10 +18,11 @@
 #define __builtin_unreachable() __assume(0)
 #endif
 
-#define PPC_FUNC(x) extern "C" void x(PPCContext& __restrict__ ctx, uint8_t* base) noexcept
+#define PPC_FUNC(x) extern "C" void x(PPCContext& __restrict__ ctx, uint8_t* base)
 
 #define PPC_FUNC_PROLOGUE() \
 	__builtin_assume((reinterpret_cast<size_t>(base) & 0xFFFFFFFF) == 0); \
+    PPCContext env; \
     PPCRegister temp; \
     PPCVRegister vtemp; \
     uint32_t ea
