@@ -191,4 +191,7 @@ void SWARecompiler::Analyse()
     }
 
     std::sort(functions.begin(), functions.end(), [](auto& lhs, auto& rhs) { return lhs.base < rhs.base; });
+
+    setJmpAddress = 0x831B6AB0;
+    longJmpAddress = 0x831B6790;
 }

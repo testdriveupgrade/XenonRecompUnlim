@@ -35,17 +35,32 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
 {
     println("\t// {} {}", insn.opcode->name, insn.op_str);
 
+    bool printedJmpEnv = false;
+
     auto printFunctionCall = [&](uint32_t ea)
         {
-            auto targetSymbol = image.symbols.find(ea);
-
-            if (targetSymbol != image.symbols.end() && targetSymbol->address == ea && targetSymbol->type == Symbol_Function)
+            if (ea == longJmpAddress)
             {
-                println("\t{}(ctx, base);", targetSymbol->name);
+                println("\tlongjmp(*reinterpret_cast<jmp_buf*>(base + ctx.r3.u32), ctx.r4.s32);");
+            }
+            else if (ea == setJmpAddress)
+            {
+                println("\tenv = ctx;");
+                println("\tctx.r3.s64 = setjmp(*reinterpret_cast<jmp_buf*>(base + ctx.r3.u32));");
+                println("\tif (ctx.r3.s64 != 0) ctx = env;");
             }
             else
             {
-                println("\t// ERROR", ea);
+                auto targetSymbol = image.symbols.find(ea);
+
+                if (targetSymbol != image.symbols.end() && targetSymbol->address == ea && targetSymbol->type == Symbol_Function)
+                {
+                    println("\t{}(ctx, base);", targetSymbol->name);
+                }
+                else
+                {
+                    println("\t// ERROR", ea);
+                }
             }
         };
 

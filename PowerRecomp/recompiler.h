@@ -15,6 +15,8 @@ struct Recompiler
     std::string out;
     size_t cppFileIndex = 0;
     std::vector<uint8_t> temp;
+    uint32_t setJmpAddress = 0;
+    uint32_t longJmpAddress = 0;
 
     void LoadSwitchTables(const char* filePath);
     void LoadExecutable(const char* filePath);
