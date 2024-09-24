@@ -125,12 +125,13 @@ Image Xex2LoadImage(const uint8_t* data)
             for (size_t im = 0; im < library->NumberOfImports; im++)
             {
                 auto originalThunk = (XEX_THUNK_DATA*)image.Find(descriptors[im].FirstThunk);
-                auto thunkType = originalThunk->Function >> 24;
+                auto originalData = originalThunk;
+                originalData->Data = std::byteswap(originalData->Data);
 
-                if (thunkType != 0)
+                if (originalData->OriginalData.Type != 0)
                 {
                     uint32_t thunk[4] = { 0x00000060, 0x00000060, 0x00000060, 0x2000804E };
-                    auto name = names->find(originalThunk->OriginalData.Ordinal);
+                    auto name = names->find(originalData->OriginalData.Ordinal);
                     if (name != names->end())
                     {
                         image.symbols.emplace(name->second, descriptors[im].FirstThunk, sizeof(thunk), Symbol_Function);
