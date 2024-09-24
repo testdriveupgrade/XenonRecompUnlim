@@ -1,4 +1,9 @@
 #pragma once
+
+#ifndef PPC_CONFIG_H_INCLUDED
+#error "ppc_config.h must be included before ppc_context.h"
+#endif
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -7,6 +12,7 @@
 
 #ifdef __clang__
 #include <x86intrin.h>
+#define PPC_NOINLINE __attribute__((noinline))
 #else
 #include <intrin.h>
 #define __restrict__ __restrict 
@@ -16,16 +22,13 @@
 #define __builtin_isnan isnan
 #define __builtin_assume __assume
 #define __builtin_unreachable() __assume(0)
+#define PPC_NOINLINE __declspec(noinline)
 #endif
 
-#define PPC_FUNC(x) extern "C" void x(PPCContext& __restrict__ ctx, uint8_t* base)
+#define PPC_FUNC(x) extern "C" PPC_NOINLINE void x(PPCContext& __restrict__ ctx, uint8_t* base)
 
 #define PPC_FUNC_PROLOGUE() \
-	__builtin_assume((reinterpret_cast<size_t>(base) & 0xFFFFFFFF) == 0); \
-    PPCContext env; \
-    PPCRegister temp; \
-    PPCVRegister vtemp; \
-    uint32_t ea
+	__builtin_assume(((size_t)base & 0xFFFFFFFF) == 0); \
 
 #define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))
 #define PPC_LOAD_U16(x) __builtin_bswap16(*(uint16_t*)(base + (x)))
@@ -36,6 +39,9 @@
 #define PPC_STORE_U16(x, y) *(uint16_t*)(base + (x)) = __builtin_bswap16(y)
 #define PPC_STORE_U32(x, y) *(uint32_t*)(base + (x)) = __builtin_bswap32(y)
 #define PPC_STORE_U64(x, y) *(uint64_t*)(base + (x)) = __builtin_bswap64(y)
+
+#define PPC_CALL_FUNC(x) x(ctx, base)
+#define PPC_CALL_INDIRECT_FUNC(x) (*(PPCFunc**)(ctx.fn + uint64_t(x) * 2))(ctx, base)
 
 typedef void PPCFunc(struct PPCContext& __restrict__ ctx, uint8_t* base);
 
@@ -83,7 +89,7 @@ struct PPCCRRegister
     };
 
     template<typename T>
-    void compare(T left, T right, const PPCXERRegister& xer)
+    inline void compare(T left, T right, const PPCXERRegister& xer) noexcept
     {
         lt = left < right;
         gt = left > right;
@@ -91,7 +97,7 @@ struct PPCCRRegister
         so = xer.so;
     }
 
-    void compare(double left, double right)
+    inline void compare(double left, double right) noexcept
     {
         un = __builtin_isnan(left) || __builtin_isnan(right);
         lt = !un && (left < right);
@@ -99,7 +105,7 @@ struct PPCCRRegister
         eq = !un && (left == right);
     }
 
-    void setFromMask(__m128 mask, int imm)
+    inline void setFromMask(__m128 mask, int imm) noexcept
     {
         int m = _mm_movemask_ps(mask);
         lt = m == imm; // all equal
@@ -108,7 +114,7 @@ struct PPCCRRegister
         so = 0;
     }
 
-    void setFromMask(__m128i mask, int imm)
+    inline void setFromMask(__m128i mask, int imm) noexcept
     {
         int m = _mm_movemask_epi8(mask);
         lt = m == imm; // all equal
@@ -139,20 +145,20 @@ struct PPCFPSCRRegister
 {
     uint32_t csr;
 
-    uint32_t loadFromHost()
+    inline uint32_t loadFromHost() noexcept
     {
         csr = _mm_getcsr();
         return (0x6C >> ((csr & _MM_ROUND_MASK) >> 12)) & 3;
     }
         
-    void storeFromGuest(uint32_t value)
+    inline void storeFromGuest(uint32_t value) noexcept
     {
         csr &= ~_MM_ROUND_MASK;
         csr |= ((0x6C >> (2 * (value & 3))) & 3) << 13;
         _mm_setcsr(csr);
     }
 
-    void setFlushMode(bool enable)
+    inline void setFlushMode(bool enable) noexcept
     {
         constexpr uint32_t mask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
         uint32_t value = enable ? (csr | mask) : (csr & ~mask);
@@ -167,13 +173,25 @@ struct PPCFPSCRRegister
 
 struct PPCContext
 {
-    PPCFunc** fn;
-    uint64_t lr;
-    PPCRegister ctr;
-    PPCXERRegister xer;
-    PPCRegister reserved;
-    uint32_t msr = 0x200A000;
+    uint8_t* fn;
 
+#ifndef PPC_CONFIG_SKIP_LR
+    uint64_t lr;
+#endif
+#ifndef PPC_CONFIG_CTR_AS_LOCAL
+    PPCRegister ctr;
+#endif
+#ifndef PPC_CONFIG_XER_AS_LOCAL
+    PPCXERRegister xer;
+#endif
+#ifndef PPC_CONFIG_RESERVED_AS_LOCAL
+    PPCRegister reserved;
+#endif
+#ifndef PPC_CONFIG_SKIP_MSR
+    uint32_t msr = 0x200A000;
+#endif
+
+#ifndef PPC_CONFIG_CR_AS_LOCAL
     PPCCRRegister cr0;
     PPCCRRegister cr1;
     PPCCRRegister cr2;
@@ -182,10 +200,15 @@ struct PPCContext
     PPCCRRegister cr5;
     PPCCRRegister cr6;
     PPCCRRegister cr7;
-    
+#endif
+
+#ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCRegister r0;
+#endif
     PPCRegister r1;
+#ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCRegister r2;
+#endif
     PPCRegister r3;
     PPCRegister r4;
     PPCRegister r5;
@@ -194,9 +217,12 @@ struct PPCContext
     PPCRegister r8;
     PPCRegister r9;
     PPCRegister r10;
+#ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCRegister r11;
     PPCRegister r12;
+#endif
     PPCRegister r13;
+#ifndef PPC_CONFIG_NON_VOLATILE_AS_LOCAL
     PPCRegister r14;
     PPCRegister r15;
     PPCRegister r16;
@@ -215,10 +241,13 @@ struct PPCContext
     PPCRegister r29;
     PPCRegister r30;
     PPCRegister r31;
+#endif
 
     PPCFPSCRRegister fpscr;
 
+#ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCRegister f0;
+#endif
     PPCRegister f1;
     PPCRegister f2;
     PPCRegister f3;
@@ -232,6 +261,7 @@ struct PPCContext
     PPCRegister f11;
     PPCRegister f12;
     PPCRegister f13;
+#ifndef PPC_CONFIG_NON_VOLATILE_AS_LOCAL
     PPCRegister f14;
     PPCRegister f15;
     PPCRegister f16;
@@ -250,7 +280,8 @@ struct PPCContext
     PPCRegister f29;
     PPCRegister f30;
     PPCRegister f31;
-    
+#endif
+
     PPCVRegister v0;
     PPCVRegister v1;
     PPCVRegister v2;
@@ -265,6 +296,7 @@ struct PPCContext
     PPCVRegister v11;
     PPCVRegister v12;
     PPCVRegister v13;
+#ifndef PPC_CONFIG_NON_VOLATILE_AS_LOCAL
     PPCVRegister v14;
     PPCVRegister v15;
     PPCVRegister v16;
@@ -283,6 +315,8 @@ struct PPCContext
     PPCVRegister v29;
     PPCVRegister v30;
     PPCVRegister v31;
+#endif
+#ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCVRegister v32;
     PPCVRegister v33;
     PPCVRegister v34;
@@ -315,6 +349,8 @@ struct PPCContext
     PPCVRegister v61;
     PPCVRegister v62;
     PPCVRegister v63;
+#endif
+#ifndef PPC_CONFIG_NON_VOLATILE_AS_LOCAL
     PPCVRegister v64;
     PPCVRegister v65;
     PPCVRegister v66;
@@ -379,6 +415,7 @@ struct PPCContext
     PPCVRegister v125;
     PPCVRegister v126;
     PPCVRegister v127;
+#endif
 };
 
 inline uint8_t VectorMaskL[] =

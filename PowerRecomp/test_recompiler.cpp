@@ -45,6 +45,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
             auto stem = file.path().stem().string();
             recompiler.Analyse(stem);
 
+            recompiler.println("#define PPC_CONFIG_H_INCLUDED");
             recompiler.println("#include <ppc_context.h>\n");
             recompiler.println("#define __debugbreak()\n");
 
@@ -95,6 +96,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
     FILE* file = fopen(std::format("{}/main.cpp", dstDirectoryPath).c_str(), "w");
     std::string main;
 
+    std::println(file, "#define PPC_CONFIG_H_INCLUDED");
     std::println(file, "#include <ppc_context.h>");
     std::println(file, "#include <Windows.h>");
     std::println(file, "#include <print>\n");

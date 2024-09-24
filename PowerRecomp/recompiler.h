@@ -7,6 +7,33 @@ struct SwitchTable
     std::vector<size_t> labels;
 };
 
+struct RecompilerLocalVariables
+{
+    bool ctr{};
+    bool xer{};
+    bool reserved{};
+    bool cr[8]{};
+    bool r[32]{};
+    bool f[32]{};
+    bool v[128]{};
+    bool env{};
+    bool temp{};
+    bool vTemp{};
+    bool ea{};
+};
+
+struct RecompilerConfig
+{
+    bool skipLr = false;
+    bool ctrAsLocalVariable = false;
+    bool xerAsLocalVariable = false;
+    bool reservedRegisterAsLocalVariable = false;
+    bool skipMsr = false;
+    bool crRegistersAsLocalVariables = false;
+    bool nonArgumentRegistersAsLocalVariables = false;
+    bool nonVolatileRegistersAsLocalVariables = false;
+};
+
 struct Recompiler
 {
     Image image;
@@ -15,8 +42,10 @@ struct Recompiler
     std::string out;
     size_t cppFileIndex = 0;
     std::vector<uint8_t> temp;
+    std::string tempString;
     uint32_t setJmpAddress = 0;
     uint32_t longJmpAddress = 0;
+    RecompilerConfig config;
 
     void LoadSwitchTables(const char* filePath);
     void LoadExecutable(const char* filePath);
@@ -34,7 +63,12 @@ struct Recompiler
         out += '\n';
     }
 
-    bool Recompile(const Function& fn, uint32_t base, const ppc_insn& insn, std::unordered_map<size_t, SwitchTable>::iterator& switchTable);
+    bool Recompile(
+        const Function& fn,
+        uint32_t base,
+        const ppc_insn& insn, 
+        std::unordered_map<size_t, SwitchTable>::iterator& switchTable, 
+        RecompilerLocalVariables& localVariables);
 
     bool Recompile(const Function& fn);
 

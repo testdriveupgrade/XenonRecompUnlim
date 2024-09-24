@@ -11,6 +11,14 @@ int main(int argc, char* argv[])
     if (strstr(argv[1], ".xex") != nullptr)
     {
         SWARecompiler recompiler;
+        recompiler.config.skipLr = true;
+        recompiler.config.ctrAsLocalVariable = true;
+        recompiler.config.xerAsLocalVariable = true;
+        recompiler.config.reservedRegisterAsLocalVariable = true;
+        recompiler.config.skipMsr = true;
+        recompiler.config.crRegistersAsLocalVariables = true;
+        recompiler.config.nonArgumentRegistersAsLocalVariables = true;
+        recompiler.config.nonVolatileRegistersAsLocalVariables = true;
 
         std::println("Loading executable...");
         recompiler.LoadExecutable(argv[1]);
