@@ -80,8 +80,9 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_ADDE:
-        // TODO: set carry flag
+        println("\ttemp.u8 = (ctx.r{}.u32 + ctx.r{}.u32 < ctx.r{}.u32) | (ctx.r{}.u32 + ctx.r{}.u32 + ctx.xer.ca < ctx.xer.ca);", insn.operands[1], insn.operands[2], insn.operands[1], insn.operands[1], insn.operands[2]);
         println("\tctx.r{}.u64 = ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\tctx.xer.ca = temp.u8;");
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
@@ -929,7 +930,7 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
     }
 
     case PPC_INST_RLWINM:
-        println("\tctx.r{}.u64 = _rotl(ctx.r{}.u32, {}) & 0x{:X};", insn.operands[0], insn.operands[1], insn.operands[2], ComputeMask(insn.operands[3] + 32, insn.operands[4] + 32));
+        println("\tctx.r{}.u64 = _rotl64(ctx.r{}.u32 | (ctx.r{}.u64 << 32), {}) & 0x{:X};", insn.operands[0], insn.operands[1], insn.operands[1], insn.operands[2], ComputeMask(insn.operands[3] + 32, insn.operands[4] + 32));
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
@@ -966,8 +967,16 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_SRADI:
-        println("\tctx.xer.ca = (ctx.r{}.s64 < 0) & ((ctx.r{}.u64 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], ComputeMask(64 - insn.operands[2], 63));
-        println("\tctx.r{}.s64 = ctx.r{}.s64 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (insn.operands[2] != 0)
+        {
+            println("\tctx.xer.ca = (ctx.r{}.s64 < 0) & ((ctx.r{}.u64 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], ComputeMask(64 - insn.operands[2], 63));
+            println("\tctx.r{}.s64 = ctx.r{}.s64 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+        }
+        else
+        {
+            println("\tctx.xer.ca = 0;");
+            println("\tctx.r{}.s64 = ctx.r{}.s64;", insn.operands[0], insn.operands[1]);
+        }
         break;
 
     case PPC_INST_SRAW:
@@ -980,8 +989,16 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_SRAWI:
-        println("\tctx.xer.ca = (ctx.r{}.s32 < 0) & ((ctx.r{}.u32 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], ComputeMask(64 - insn.operands[2], 63));
-        println("\tctx.r{}.s64 = ctx.r{}.s32 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+        if (insn.operands[2] != 0)
+        {
+            println("\tctx.xer.ca = (ctx.r{}.s32 < 0) & ((ctx.r{}.u32 & 0x{:X}) != 0);", insn.operands[1], insn.operands[1], ComputeMask(64 - insn.operands[2], 63));
+            println("\tctx.r{}.s64 = ctx.r{}.s32 >> {};", insn.operands[0], insn.operands[1], insn.operands[2]);
+        }
+        else
+        {
+            println("\tctx.xer.ca = 0;");
+            println("\tctx.r{}.s64 = ctx.r{}.s32;", insn.operands[0], insn.operands[1]);
+        }
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
@@ -1223,8 +1240,9 @@ bool Recompiler::Recompile(const Function& fn, uint32_t base, const ppc_insn& in
         break;
 
     case PPC_INST_SUBFE:
-        // TODO: do we need to set the carry flag here?
+        println("\ttemp.u8 = (~ctx.r{}.u32 + ctx.r{}.u32 < ~ctx.r{}.u32) | (~ctx.r{}.u32 + ctx.r{}.u32 + ctx.xer.ca < ctx.xer.ca);", insn.operands[1], insn.operands[2], insn.operands[1], insn.operands[1], insn.operands[2]);
         println("\tctx.r{}.u64 = ~ctx.r{}.u64 + ctx.r{}.u64 + ctx.xer.ca;", insn.operands[0], insn.operands[1], insn.operands[2]);
+        println("\tctx.xer.ca = temp.u8;");
         if (strchr(insn.opcode->name, '.'))
             println("\tctx.cr0.compare<int32_t>(ctx.r{}.s32, 0, ctx.xer);", insn.operands[0]);
         break;
