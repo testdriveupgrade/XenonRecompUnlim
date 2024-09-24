@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #define STRINGIFY(X) #X
-#define XE_EXPORT(MODULE, ORDINAL, NAME, TYPE) { (ORDINAL), STRINGIFY(NAME) }
+#define XE_EXPORT(MODULE, ORDINAL, NAME, TYPE) { (ORDINAL), "__imp__" STRINGIFY(NAME) }
 
 std::unordered_map<size_t, const char*> XamExports = 
 {
