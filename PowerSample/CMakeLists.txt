@@ -2,6 +2,7 @@ project("PowerSample")
 
 add_compile_options(
     "/fp:strict"
+    "/GS-"
     "-march=x86-64-v3"
     "-fno-strict-aliasing")
 

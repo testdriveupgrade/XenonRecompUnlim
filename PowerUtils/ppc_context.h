@@ -160,19 +160,19 @@ struct PPCFPSCRRegister
 
     static constexpr size_t FlushMask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
 
-    inline void enableFlushModeUnconditional()
+    inline void enableFlushModeUnconditional() noexcept
     {
         csr |= FlushMask;
         _mm_setcsr(csr);
     }
 
-    inline void disableFlushModeUnconditional()
+    inline void disableFlushModeUnconditional() noexcept
     {
         csr &= ~FlushMask;
         _mm_setcsr(csr);
     }
 
-    inline void enableFlushMode()
+    inline void enableFlushMode() noexcept
     {
         if ((csr & FlushMask) != FlushMask) [[unlikely]]
         {
@@ -181,7 +181,7 @@ struct PPCFPSCRRegister
         }
     }
 
-    inline void disableFlushMode()
+    inline void disableFlushMode() noexcept
     {
         if ((csr & FlushMask) != 0) [[unlikely]]
         {
