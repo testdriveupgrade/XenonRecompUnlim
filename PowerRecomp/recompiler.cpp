@@ -1968,7 +1968,11 @@ bool Recompiler::Recompile(const Function& fn)
     while (base < end)
     {
         if (labels.contains(base))
+        {
             println("loc_{:X}:", base);
+            // With a read barrier we prevent the compiler from doing unsafe code reordering. I wonder if we could do this better...
+            println("\t_ReadBarrier();");
+        }
 
         if (switchTable == switchTables.end())
             switchTable = switchTables.find(base);

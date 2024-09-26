@@ -9,12 +9,12 @@
 #include <cstring>
 #include <cmath>
 #include <csetjmp>
+#include <intrin.h>
 
 #ifdef __clang__
 #include <x86intrin.h>
 #define PPC_NOINLINE __attribute__((noinline))
 #else
-#include <intrin.h>
 #define __restrict__ __restrict 
 #define __builtin_bswap16 _byteswap_ushort 
 #define __builtin_bswap32 _byteswap_ulong 
