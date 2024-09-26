@@ -3,9 +3,7 @@ project("PowerSample")
 add_compile_options(
     "/fp:strict"
     "-march=x86-64-v3"
-    "-fno-strict-aliasing"
-    "-Wno-unused-label"
-    "-Wno-unused-variable")
+    "-fno-strict-aliasing")
 
 file(GLOB RecompiledFiles *.cpp)
 add_library(PowerSample ${RecompiledFiles})

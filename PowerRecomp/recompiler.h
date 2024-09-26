@@ -41,8 +41,6 @@ struct Recompiler
     std::unordered_map<size_t, SwitchTable> switchTables;
     std::string out;
     size_t cppFileIndex = 0;
-    std::vector<uint8_t> temp;
-    std::string tempString;
     uint32_t setJmpAddress = 0;
     uint32_t longJmpAddress = 0;
     RecompilerConfig config;

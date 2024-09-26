@@ -1920,6 +1920,29 @@ bool Recompiler::Recompile(const Function& fn)
     auto end = base + fn.size;
     auto* data = (uint32_t*)image.Find(base);
 
+    static std::unordered_set<size_t> labels;
+    labels.clear();
+
+    for (size_t addr = base; addr < end; addr += 4)
+    {
+        const uint32_t instruction = std::byteswap(*(uint32_t*)((char*)data + addr - base));
+        if (!PPC_BL(instruction))
+        {
+            const size_t op = PPC_OP(instruction);
+            if (op == PPC_OP_B)
+                labels.emplace(addr + PPC_BI(instruction));
+            else if (op == PPC_OP_BC)
+                labels.emplace(addr + PPC_BD(instruction));
+        }
+
+        auto switchTable = switchTables.find(addr);
+        if (switchTable != switchTables.end())
+        {
+            for (auto label : switchTable->second.labels)
+                labels.emplace(label);
+        }
+    }
+
     auto symbol = image.symbols.find(fn.base);
     if (symbol != image.symbols.end())
     {
@@ -1937,13 +1960,15 @@ bool Recompiler::Recompile(const Function& fn)
 
     // TODO: the printing scheme here is scuffed
     RecompilerLocalVariables localVariables;
+    static std::string tempString;
     tempString.clear();
     std::swap(out, tempString);
 
     ppc_insn insn;
     while (base < end)
     {
-        println("loc_{:X}:", base);
+        if (labels.contains(base))
+            println("loc_{:X}:", base);
 
         if (switchTable == switchTables.end())
             switchTable = switchTables.find(base);
@@ -2122,6 +2147,8 @@ void Recompiler::SaveCurrentOutData(const char* directoryPath, const std::string
         FILE* f = fopen(filePath.c_str(), "rb");
         if (f)
         {
+            static std::vector<uint8_t> temp;
+
             fseek(f, 0, SEEK_END);
             long fileSize = ftell(f);
             if (fileSize == out.size())
