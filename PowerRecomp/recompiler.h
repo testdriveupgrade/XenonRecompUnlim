@@ -34,6 +34,13 @@ struct RecompilerConfig
     bool nonVolatileRegistersAsLocalVariables = false;
 };
 
+enum class CSRState
+{
+    Unknown,
+    FPU,
+    VMX
+};
+
 struct Recompiler
 {
     Image image;
@@ -61,12 +68,14 @@ struct Recompiler
         out += '\n';
     }
 
+    // TODO: make a RecompileArgs struct instead this is getting messy
     bool Recompile(
         const Function& fn,
         uint32_t base,
         const ppc_insn& insn, 
         std::unordered_map<size_t, SwitchTable>::iterator& switchTable, 
-        RecompilerLocalVariables& localVariables);
+        RecompilerLocalVariables& localVariables,
+        CSRState& csrState);
 
     bool Recompile(const Function& fn);
 

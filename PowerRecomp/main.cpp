@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
     if (strstr(argv[1], ".xex") != nullptr)
     {
         SWARecompiler recompiler;
-        recompiler.config.skipLr = true;
+        //recompiler.config.skipLr = true;
         recompiler.config.ctrAsLocalVariable = true;
         recompiler.config.xerAsLocalVariable = true;
         recompiler.config.reservedRegisterAsLocalVariable = true;

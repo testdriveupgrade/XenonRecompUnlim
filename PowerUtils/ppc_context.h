@@ -158,15 +158,35 @@ struct PPCFPSCRRegister
         _mm_setcsr(csr);
     }
 
-    inline void setFlushMode(bool enable) noexcept
+    static constexpr size_t FlushMask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
+
+    inline void enableFlushModeUnconditional()
     {
-        constexpr uint32_t mask = _MM_FLUSH_ZERO_MASK | _MM_DENORMALS_ZERO_MASK;
-        uint32_t value = enable ? (csr | mask) : (csr & ~mask);
-        
-        if (csr != value)
+        csr |= FlushMask;
+        _mm_setcsr(csr);
+    }
+
+    inline void disableFlushModeUnconditional()
+    {
+        csr &= ~FlushMask;
+        _mm_setcsr(csr);
+    }
+
+    inline void enableFlushMode()
+    {
+        if ((csr & FlushMask) != FlushMask) [[unlikely]]
         {
-            _mm_setcsr(value);
-            csr = value;
+            csr |= FlushMask;
+            _mm_setcsr(csr);
+        }
+    }
+
+    inline void disableFlushMode()
+    {
+        if ((csr & FlushMask) != 0) [[unlikely]]
+        {
+            csr &= ~FlushMask;
+            _mm_setcsr(csr);
         }
     }
 };
