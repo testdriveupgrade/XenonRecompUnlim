@@ -4,28 +4,18 @@
 #error "ppc_config.h must be included before ppc_context.h"
 #endif
 
+#include <cmath>
+#include <csetjmp>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
-#include <csetjmp>
+
 #include <intrin.h>
-
-#ifdef __clang__
 #include <x86intrin.h>
-#define PPC_NOINLINE __attribute__((noinline))
-#else
-#define __restrict__ __restrict 
-#define __builtin_bswap16 _byteswap_ushort 
-#define __builtin_bswap32 _byteswap_ulong 
-#define __builtin_bswap64 _byteswap_uint64 
-#define __builtin_isnan isnan
-#define __builtin_assume __assume
-#define __builtin_unreachable() __assume(0)
-#define PPC_NOINLINE __declspec(noinline)
-#endif
 
-#define PPC_FUNC(x) extern "C" PPC_NOINLINE void x(PPCContext& __restrict__ ctx, uint8_t* base)
+#define PPC_FUNC(x) void x(PPCContext& __restrict ctx, uint8_t* base)
+#define PPC_EXTERN_FUNC(x) extern PPC_FUNC(x)
+#define PPC_WEAK_FUNC(x) __attribute__((weak,noinline)) PPC_FUNC(x)
 
 #define PPC_FUNC_PROLOGUE() __builtin_assume(((size_t)base & 0xFFFFFFFF) == 0)
 
@@ -50,7 +40,7 @@ struct PPCFuncMapping
     PPCFunc* host;
 };
 
-extern "C" PPCFuncMapping PPCFuncMappings[];
+extern PPCFuncMapping PPCFuncMappings[];
 
 struct PPCRegister
 {

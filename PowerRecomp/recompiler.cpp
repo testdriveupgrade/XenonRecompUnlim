@@ -1964,11 +1964,11 @@ bool Recompiler::Recompile(const Function& fn)
     auto symbol = image.symbols.find(fn.base);
     if (symbol != image.symbols.end())
     {
-        println("PPC_FUNC({}) {{", symbol->name);
+        println("PPC_WEAK_FUNC({}) {{", symbol->name);
     }
     else
     {
-        println("PPC_FUNC(sub_{}) {{", fn.base);
+        println("PPC_WEAK_FUNC(sub_{}) {{", fn.base);
     }
 
     println("\tPPC_FUNC_PROLOGUE();");
@@ -2120,7 +2120,7 @@ void Recompiler::Recompile(const char* directoryPath)
         println("#include <ppc_context.h>\n");
 
         for (auto& symbol : image.symbols)
-            println("PPC_FUNC({});", symbol.name);
+            println("PPC_EXTERN_FUNC({});", symbol.name);
 
         SaveCurrentOutData(directoryPath, "ppc_recomp_shared.h");
     }
@@ -2128,7 +2128,7 @@ void Recompiler::Recompile(const char* directoryPath)
     {
         println("#include \"ppc_recomp_shared.h\"\n");
 
-        println("extern \"C\" PPCFuncMapping PPCFuncMappings[] = {{");
+        println("PPCFuncMapping PPCFuncMappings[] = {{");
         for (auto& symbol : image.symbols)
             println("\t{{ 0x{:X}, {} }},", symbol.address, symbol.name);
 

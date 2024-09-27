@@ -1,8 +1,10 @@
 project("PowerSample")
 
 add_compile_options(
+    "/D_HAS_EXCEPTIONS=0"
     "/fp:strict"
     "/GS-"
+    "/EHa-"
     "-march=haswell"
     "-fno-strict-aliasing")
 
