@@ -560,7 +560,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FADDS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64 + {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
+        println("\t{}.f64 = double(float({}.f64 + {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
         break;
 
     case PPC_INST_FCFID:
@@ -575,17 +575,17 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FCTID:
         printSetFlushMode(false);
-        println("\t{}.s64 = ({}.f64 > double(LLONG_MAX)) ? LLONG_MAX : _mm_cvtsd_si64(_mm_load1_pd(&{}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[1]));
+        println("\t{}.s64 = ({}.f64 > double(LLONG_MAX)) ? LLONG_MAX : _mm_cvtsd_si64(_mm_load_sd(&{}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[1]));
         break;
 
     case PPC_INST_FCTIDZ:
         printSetFlushMode(false);
-        println("\t{}.s64 = ({}.f64 > double(LLONG_MAX)) ? LLONG_MAX : _mm_cvttsd_si64(_mm_load1_pd(&{}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[1]));
+        println("\t{}.s64 = ({}.f64 > double(LLONG_MAX)) ? LLONG_MAX : _mm_cvttsd_si64(_mm_load_sd(&{}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[1]));
         break;
 
     case PPC_INST_FCTIWZ:
         printSetFlushMode(false);
-        println("\t{}.s64 = ({}.f64 > double(INT_MAX)) ? INT_MAX : _mm_cvttsd_si32(_mm_load1_pd(&{}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[1]));
+        println("\t{}.s64 = ({}.f64 > double(INT_MAX)) ? INT_MAX : _mm_cvttsd_si32(_mm_load_sd(&{}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[1]));
         break;
 
     case PPC_INST_FDIV:
@@ -595,7 +595,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FDIVS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64 / {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
+        println("\t{}.f64 = double(float({}.f64 / {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
         break;
 
     case PPC_INST_FMADD:
@@ -605,7 +605,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FMADDS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64 * {}.f64 + {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
+        println("\t{}.f64 = double(float({}.f64 * {}.f64 + {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
         break;
 
     case PPC_INST_FMR:
@@ -620,7 +620,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FMSUBS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64 * {}.f64 - {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
+        println("\t{}.f64 = double(float({}.f64 * {}.f64 - {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
         break;
 
     case PPC_INST_FMUL:
@@ -630,7 +630,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FMULS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64 * {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
+        println("\t{}.f64 = double(float({}.f64 * {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
         break;
 
     case PPC_INST_FNABS:
@@ -645,7 +645,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FNMADDS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float(-({}.f64 * {}.f64 + {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
+        println("\t{}.f64 = double(float(-({}.f64 * {}.f64 + {}.f64)));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
         break;
 
     case PPC_INST_FNMSUB:
@@ -655,7 +655,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FNMSUBS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float(-({}.f64 * {}.f64 - {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
+        println("\t{}.f64 = double(float(-({}.f64 * {}.f64 - {}.f64)));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
         break;
 
     case PPC_INST_FRES:
@@ -665,7 +665,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FRSP:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64);", f(insn.operands[0]), f(insn.operands[1]));
+        println("\t{}.f64 = double(float({}.f64));", f(insn.operands[0]), f(insn.operands[1]));
         break;
 
     case PPC_INST_FSEL:
@@ -680,7 +680,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FSQRTS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float(sqrt({}.f64));", f(insn.operands[0]), f(insn.operands[1]));
+        println("\t{}.f64 = double(float(sqrt({}.f64)));", f(insn.operands[0]), f(insn.operands[1]));
         break;
 
     case PPC_INST_FSUB:
@@ -690,7 +690,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_FSUBS:
         printSetFlushMode(false);
-        println("\t{}.f64 = float({}.f64 - {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
+        println("\t{}.f64 = double(float({}.f64 - {}.f64));", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]));
         break;
 
     case PPC_INST_LBZ:
@@ -763,7 +763,7 @@ bool Recompiler::Recompile(
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{});", int32_t(insn.operands[1]));
-        println("\t{}.f64 = {}.f32;", f(insn.operands[0]), temp());
+        println("\t{}.f64 = double({}.f32);", f(insn.operands[0]), temp());
         break;
 
     case PPC_INST_LFSX:
@@ -772,7 +772,7 @@ bool Recompiler::Recompile(
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32);", r(insn.operands[2]));
-        println("\t{}.f64 = {}.f32;", f(insn.operands[0]), temp());
+        println("\t{}.f64 = double({}.f32);", f(insn.operands[0]), temp());
         break;
 
     case PPC_INST_LHA:
@@ -1227,7 +1227,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_STFS:
         printSetFlushMode(false);
-        println("\t{}.f32 = {}.f64;", temp(), f(insn.operands[0]));
+        println("\t{}.f32 = float({}.f64);", temp(), f(insn.operands[0]));
         print("\tPPC_STORE_U32(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
@@ -1236,7 +1236,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_STFSX:
         printSetFlushMode(false);
-        println("\t{}.f32 = {}.f64;", temp(), f(insn.operands[0]));
+        println("\t{}.f32 = float({}.f64);", temp(), f(insn.operands[0]));
         print("\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));

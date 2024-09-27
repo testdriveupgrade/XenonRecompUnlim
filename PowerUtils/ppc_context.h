@@ -27,8 +27,7 @@
 
 #define PPC_FUNC(x) extern "C" PPC_NOINLINE void x(PPCContext& __restrict__ ctx, uint8_t* base)
 
-#define PPC_FUNC_PROLOGUE() \
-	__builtin_assume(((size_t)base & 0xFFFFFFFF) == 0); \
+#define PPC_FUNC_PROLOGUE() __builtin_assume(((size_t)base & 0xFFFFFFFF) == 0)
 
 #define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))
 #define PPC_LOAD_U16(x) __builtin_bswap16(*(uint16_t*)(base + (x)))
@@ -141,20 +140,29 @@ struct alignas(0x10) PPCVRegister
     };
 };
 
+#define PPC_ROUND_NEAREST 0x00
+#define PPC_ROUND_TOWARD_ZERO 0x01
+#define PPC_ROUND_UP 0x02
+#define PPC_ROUND_DOWN 0x03
+#define PPC_ROUND_MASK 0x03
+
 struct PPCFPSCRRegister
 {
     uint32_t csr;
 
+    static constexpr size_t GuestToHost[] = { _MM_ROUND_NEAREST, _MM_ROUND_TOWARD_ZERO, _MM_ROUND_UP, _MM_ROUND_DOWN };
+    static constexpr size_t HostToGuest[] = { PPC_ROUND_NEAREST, PPC_ROUND_DOWN, PPC_ROUND_UP, PPC_ROUND_TOWARD_ZERO };
+
     inline uint32_t loadFromHost() noexcept
     {
         csr = _mm_getcsr();
-        return (0x6C >> ((csr & _MM_ROUND_MASK) >> 12)) & 3;
+        return HostToGuest[(csr & _MM_ROUND_MASK) >> 13];
     }
         
     inline void storeFromGuest(uint32_t value) noexcept
     {
         csr &= ~_MM_ROUND_MASK;
-        csr |= ((0x6C >> (2 * (value & 3))) & 3) << 13;
+        csr |= GuestToHost[value & PPC_ROUND_MASK];
         _mm_setcsr(csr);
     }
 
