@@ -157,7 +157,14 @@ bool Recompiler::Recompile(
 
                 if (targetSymbol != image.symbols.end() && targetSymbol->address == address && targetSymbol->type == Symbol_Function)
                 {
-                    println("\t{}(ctx, base);", targetSymbol->name);
+                    if (config.nonVolatileRegistersAsLocalVariables && (targetSymbol->name.starts_with("__rest") || targetSymbol->name.starts_with("__save")))
+                    {
+                        // print nothing
+                    }
+                    else
+                    {
+                        println("\t{}(ctx, base);", targetSymbol->name);
+                    }
                 }
                 else
                 {

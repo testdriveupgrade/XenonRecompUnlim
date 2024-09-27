@@ -20,7 +20,18 @@ void SWARecompiler::Analyse()
         f.base = fn.BeginAddress;
         f.size = fn.FunctionLength * 4;
 
-        image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
+        std::string name;
+        if (f.base == 0x831B0B40) name = "__restgprlr_14";
+        else if (f.base == 0x831B0AF0) name = "__savegprlr_14";
+        else if (f.base == 0x831B144C) name = "__restfpr_14";
+        else if (f.base == 0x831B1400) name = "__savefpr_14";
+        else if (f.base == 0x831B36E8) name = "__restvmx_14";
+        else if (f.base == 0x831B3450) name = "__savevmx_14";
+        else if (f.base == 0x831B377C) name = "__restvmx_64";
+        else if (f.base == 0x831B34E4) name = "__savevmx_64";
+        else name = std::format("sub_{:X}", f.base);
+
+        image.symbols.emplace(name, f.base, f.size, Symbol_Function);
     }
 
     for (size_t i = 15; i < 128; i++)
