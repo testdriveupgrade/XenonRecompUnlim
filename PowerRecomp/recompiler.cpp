@@ -1685,7 +1685,9 @@ bool Recompiler::Recompile(
             for (size_t i = 0; i < 4; i++)
             {
                 constexpr size_t indices[] = { 3, 0, 1, 2 };
-                println("\t{}.u32 {}= uint32_t({}.u8[{}]) << {};", temp(), i == 0 ? "" : "|", v(insn.operands[1]), i * 4, indices[i] * 8);
+                println("\t{}.u32[{}] = 0x404000FF;", vTemp(), i);
+                println("\t{}.f32[{}] = {}.f32[{}] < 3.0f ? 3.0f : ({}.f32[{}] > {}.f32[{}] ? {}.f32[{}] : {}.f32[{}]);", vTemp(), i, v(insn.operands[1]), i, v(insn.operands[1]), i, vTemp(), i, vTemp(), i, v(insn.operands[1]), i);
+                println("\t{}.u32 {}= uint32_t({}.u8[{}]) << {};", temp(), i == 0 ? "" : "|", vTemp(), i * 4, indices[i] * 8);
             }
             println("\t{}.u32[3] = {}.u32;", v(insn.operands[0]), temp());
             break;
