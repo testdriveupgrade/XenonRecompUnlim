@@ -1712,8 +1712,9 @@ bool Recompiler::Recompile(
 
     case PPC_INST_VREFP:
     case PPC_INST_VREFP128:
+        // TODO: see if we can use rcp safely
         printSetFlushMode(true);
-        println("\t_mm_store_ps({}.f32, _mm_rcp_ps(_mm_load_ps({}.f32)));", v(insn.operands[0]), v(insn.operands[1]));
+        println("\t_mm_store_ps({}.f32, _mm_div_ps(_mm_set1_ps(1), _mm_load_ps({}.f32)));", v(insn.operands[0]), v(insn.operands[1]));
         break;
 
     case PPC_INST_VRFIM:
@@ -1743,8 +1744,10 @@ bool Recompiler::Recompile(
 
     case PPC_INST_VRSQRTEFP:
     case PPC_INST_VRSQRTEFP128:
+        // TODO: see if we can use rsqrt safely
+        // TODO: we can detect if the input is from a dot product and apply logic only on one value
         printSetFlushMode(true);
-        println("\t_mm_store_ps({}.f32, _mm_rsqrt_ps(_mm_load_ps({}.f32)));", v(insn.operands[0]), v(insn.operands[1]));
+        println("\t_mm_store_ps({}.f32, _mm_div_ps(_mm_set1_ps(1), _mm_sqrt_ps(_mm_load_ps({}.f32))));", v(insn.operands[0]), v(insn.operands[1]));
         break;
 
     case PPC_INST_VSEL:
