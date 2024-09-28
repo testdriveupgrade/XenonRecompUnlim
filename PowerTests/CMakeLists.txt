@@ -6,5 +6,8 @@ add_compile_options(
     "-Wno-unused-variable")
 
 file(GLOB TestFiles *.cpp)
-add_executable(PowerTests ${TestFiles})
-target_link_libraries(PowerTests PUBLIC PowerUtils)
+
+if(TestFiles)
+    add_executable(PowerTests ${TestFiles})
+    target_link_libraries(PowerTests PUBLIC PowerUtils)
+endif()

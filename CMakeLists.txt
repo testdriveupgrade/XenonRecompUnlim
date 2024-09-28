@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.20)
-set(THIRDPARTY_ROOT ${CMAKE_SOURCE_DIR}/thirdparty)
+set(THIRDPARTY_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
 set(CMAKE_CXX_STANDARD 23)
 set(BUILD_SHARED_LIBS OFF)
 
