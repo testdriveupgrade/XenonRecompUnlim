@@ -12,10 +12,10 @@ enum SymbolType
 
 struct Symbol
 {
-    std::string name{};
+    mutable std::string name{};
     uint32_t address{};
     uint32_t size{};
-    SymbolType type{};
+    mutable SymbolType type{};
 };
 
 struct SymbolComparer

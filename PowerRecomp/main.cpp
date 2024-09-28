@@ -29,6 +29,12 @@ int main(int argc, char* argv[])
         std::println("Analysing functions...");
         recompiler.Analyse();
 
+        auto entry = recompiler.image.symbols.find(recompiler.image.entry_point);
+        if (entry != recompiler.image.symbols.end())
+        {
+            entry->name = "_xstart";
+        }
+
         recompiler.Recompile(argv[3]);
     }
     else
