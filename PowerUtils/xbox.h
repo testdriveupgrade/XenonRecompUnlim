@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <type_traits>
 #include <bit>
+#include <string>
+
 
 #ifdef _WIN32
     #include <windows.h>
@@ -50,6 +52,16 @@
 #define CHECK_GUEST_HANDLE(HANDLE) (((HANDLE) & 0x80000000) == 0x80000000)
 #define GUEST_HANDLE(HANDLE) ((HANDLE) | 0x80000000)
 #define HOST_HANDLE(HANDLE) ((HANDLE) & ~0x80000000)
+
+// Return true to free the associated memory
+typedef bool(*TypeDestructor_t)(void*);
+
+template<typename T>
+bool DestroyObject(void* obj)
+{
+    static_cast<T*>(obj)->~T();
+    return true;
+}
 
 template<typename T>
 struct be
@@ -117,12 +129,13 @@ struct be
     }
 };
 
+extern "C" void* MmGetHostAddress(uint32_t ptr);
 template<typename T>
 struct xpointer
 {
     be<uint32_t> ptr;
 
-    xpointer(T* ptr) : ptr(ptr)
+    xpointer(T* ptr) : ptr((uint32_t)ptr)
     {
 
     }
@@ -134,7 +147,7 @@ struct xpointer
             return nullptr;
         }
 
-        return static_cast<T*>(ptr);
+        return reinterpret_cast<T*>(MmGetHostAddress(ptr));
     }
 
     operator T* () const
@@ -146,6 +159,12 @@ struct xpointer
     {
         return get();
     }
+};
+
+template<typename TGuest>
+struct HostObject
+{
+    typedef TGuest guest_type;
 };
 
 typedef BYTE XBYTE;
@@ -305,3 +324,100 @@ typedef struct _XKSEMAPHORE
     XDISPATCHER_HEADER Header;
     XDWORD Limit;
 } XKSEMAPHORE;
+
+typedef struct _XUSER_SIGNIN_INFO {
+    be<ULONGLONG> xuid;
+    XDWORD dwField08;
+    XDWORD SigninState;
+    XDWORD dwField10;
+    XDWORD dwField14;
+    CHAR Name[16];
+} XUSER_SIGNIN_INFO;
+
+// Content types
+#define XCONTENTTYPE_SAVEDATA 1
+#define XCONTENTTYPE_DLC      2
+#define XCONTENTTYPE_RESERVED 3
+
+#define XCONTENT_NEW      1
+#define XCONTENT_EXISTING 2
+
+#define XCONTENT_MAX_DISPLAYNAME 128
+#define XCONTENT_MAX_FILENAME    42
+#define XCONTENTDEVICE_MAX_NAME  27
+
+typedef struct _XCONTENT_DATA
+{
+    XDWORD DeviceID;
+    XDWORD dwContentType;
+    be<WCHAR> szDisplayName[XCONTENT_MAX_DISPLAYNAME];
+    CHAR szFileName[XCONTENT_MAX_FILENAME];
+} XCONTENT_DATA, * PXCONTENT_DATA;
+
+typedef struct _XHOSTCONTENT_DATA : _XCONTENT_DATA
+{
+    // This is a host exclusive type so we don't care what goes on
+    std::string szRoot{};
+} XHOSTCONTENT_DATA, *PXHOSTCONTENT_DATA;
+
+
+#define XCONTENTDEVICETYPE_HDD 1
+#define XCONTENTDEVICETYPE_MU 2
+
+typedef struct _XDEVICE_DATA
+{
+    XDWORD DeviceID;
+    XDWORD DeviceType;
+    XQWORD ulDeviceBytes;
+    XQWORD ulDeviceFreeBytes;
+    be<WCHAR> wszName[XCONTENTDEVICE_MAX_NAME];
+} XDEVICE_DATA, *PXDEVICE_DATA;
+
+// Direct reflection of XInput structures
+
+#define XAMINPUT_GAMEPAD_DPAD_UP          0x0001
+#define XAMINPUT_GAMEPAD_DPAD_DOWN        0x0002
+#define XAMINPUT_GAMEPAD_DPAD_LEFT        0x0004
+#define XAMINPUT_GAMEPAD_DPAD_RIGHT       0x0008
+#define XAMINPUT_GAMEPAD_START            0x0010
+#define XAMINPUT_GAMEPAD_BACK             0x0020
+#define XAMINPUT_GAMEPAD_LEFT_THUMB       0x0040
+#define XAMINPUT_GAMEPAD_RIGHT_THUMB      0x0080
+#define XAMINPUT_GAMEPAD_LEFT_SHOULDER    0x0100
+#define XAMINPUT_GAMEPAD_RIGHT_SHOULDER   0x0200
+#define XAMINPUT_GAMEPAD_A                0x1000
+#define XAMINPUT_GAMEPAD_B                0x2000
+#define XAMINPUT_GAMEPAD_X                0x4000
+#define XAMINPUT_GAMEPAD_Y                0x8000
+
+typedef struct _XAMINPUT_GAMEPAD
+{
+    WORD                                wButtons;
+    BYTE                                bLeftTrigger;
+    BYTE                                bRightTrigger;
+    SHORT                               sThumbLX;
+    SHORT                               sThumbLY;
+    SHORT                               sThumbRX;
+    SHORT                               sThumbRY;
+} XAMINPUT_GAMEPAD, *PXAMINPUT_GAMEPAD;
+
+typedef struct _XAMINPUT_VIBRATION
+{
+    WORD                                wLeftMotorSpeed;
+    WORD                                wRightMotorSpeed;
+} XAMINPUT_VIBRATION, * PXAMINPUT_VIBRATION;
+
+typedef struct _XAMINPUT_CAPABILITIES
+{
+    BYTE                                Type;
+    BYTE                                SubType;
+    WORD                                Flags;
+    XAMINPUT_GAMEPAD                    Gamepad;
+    XAMINPUT_VIBRATION                  Vibration;
+} XAMINPUT_CAPABILITIES, * PXAMINPUT_CAPABILITIES;
+
+typedef struct _XAMINPUT_STATE
+{
+    DWORD                               dwPacketNumber;
+    XAMINPUT_GAMEPAD                    Gamepad;
+} XAMINPUT_STATE, * PXAMINPUT_STATE;
