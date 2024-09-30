@@ -40,8 +40,12 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
     {
         if (file.path().extension() == ".o")
         {
+            const auto exeFile = LoadFile(file.path().string().c_str()).value();
+
             TestRecompiler recompiler;
-            recompiler.LoadExecutable(file.path().string().c_str());
+            recompiler.config.outDirectoryPath = dstDirectoryPath;
+            recompiler.image = Image::ParseImage(exeFile.data(), exeFile.size()).value();
+
             auto stem = file.path().stem().string();
             recompiler.Analyse(stem);
 
@@ -61,7 +65,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                 }
             }
             stem += ".cpp";
-            recompiler.SaveCurrentOutData(dstDirectoryPath, stem);
+            recompiler.SaveCurrentOutData(stem);
         }
     }
 

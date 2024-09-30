@@ -9,33 +9,156 @@ static uint64_t ComputeMask(uint32_t mstart, uint32_t mstop)
     return mstart <= mstop ? value : ~value;
 }
 
-void Recompiler::LoadSwitchTables(const char* filePath)
+void Recompiler::LoadConfig(const std::string_view& configFilePath)
 {
-    toml::table toml = toml::parse_file(filePath);
-    for (auto& entry : *toml["switch"].as_array())
-    {
-        auto& table = *entry.as_table();
+    config.Load(configFilePath);
 
-        SwitchTable switchTable;
-        switchTable.r = *table["r"].value<size_t>();
-        for (auto& array : *table["labels"].as_array())
-            switchTable.labels.push_back(*array.value<size_t>());
-
-        switchTables.emplace(*table["base"].value<size_t>(), std::move(switchTable));
-    }
+    const auto file = LoadFile((config.directoryPath + config.filePath).c_str()).value();
+    image = Image::ParseImage(file.data(), file.size()).value();
 }
 
-void Recompiler::LoadExecutable(const char* filePath)
+void Recompiler::Analyse()
 {
-    const auto file = LoadFile(filePath).value();
-    image = Image::ParseImage(file.data(), file.size()).value();
+    for (size_t i = 14; i < 128; i++)
+    {
+        if (i < 32)
+        {
+            auto& restgpr = functions.emplace_back();
+            restgpr.base = config.restGpr14Address + (i - 14) * 4;
+            restgpr.size = (32 - i) * 4 + 12;
+            image.symbols.emplace(std::format("__restgprlr_{}", i), restgpr.base, restgpr.size, Symbol_Function);
+
+            auto& savegpr = functions.emplace_back();
+            savegpr.base = config.saveGpr14Address + (i - 14) * 4;
+            savegpr.size = (32 - i) * 4 + 8;
+            image.symbols.emplace(std::format("__savegprlr_{}", i), savegpr.base, savegpr.size, Symbol_Function);
+
+            auto& restfpr = functions.emplace_back();
+            restfpr.base = config.restFpr14Address + (i - 14) * 4;
+            restfpr.size = (32 - i) * 4 + 4;
+            image.symbols.emplace(std::format("__restfpr_{}", i), restfpr.base, restfpr.size, Symbol_Function);
+
+            auto& savefpr = functions.emplace_back();
+            savefpr.base = config.saveFpr14Address + (i - 14) * 4;
+            savefpr.size = (32 - i) * 4 + 4;
+            image.symbols.emplace(std::format("__savefpr_{}", i), savefpr.base, savefpr.size, Symbol_Function);
+
+            auto& restvmx = functions.emplace_back();
+            restvmx.base = config.restVmx14Address + (i - 14) * 8;
+            restvmx.size = (32 - i) * 8 + 4;
+            image.symbols.emplace(std::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
+
+            auto& savevmx = functions.emplace_back();
+            savevmx.base = config.saveVmx14Address + (i - 14) * 8;
+            savevmx.size = (32 - i) * 8 + 4;
+            image.symbols.emplace(std::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
+        }
+
+        if (i >= 64)
+        {
+            auto& restvmx = functions.emplace_back();
+            restvmx.base = config.restVmx64Address + (i - 64) * 8;
+            restvmx.size = (128 - i) * 8 + 4;
+            image.symbols.emplace(std::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
+
+            auto& savevmx = functions.emplace_back();
+            savevmx.base = config.saveVmx64Address + (i - 64) * 8;
+            savevmx.size = (128 - i) * 8 + 4;
+            image.symbols.emplace(std::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
+        }
+    }
+
+    for (auto& [address, size] : config.functions)
+    {
+        functions.emplace_back(address, size);
+        image.symbols.emplace(std::format("sub_{:X}", address), address, size, Symbol_Function);
+    }
+
+    auto& pdata = *image.Find(".pdata");
+    size_t count = pdata.size / sizeof(IMAGE_CE_RUNTIME_FUNCTION);
+    auto* pf = (IMAGE_CE_RUNTIME_FUNCTION*)pdata.data;
+    for (size_t i = 0; i < count; i++)
+    {
+        auto fn = pf[i];
+        fn.BeginAddress = std::byteswap(fn.BeginAddress);
+        fn.Data = std::byteswap(fn.Data);
+
+        if (image.symbols.find(fn.BeginAddress) == image.symbols.end())
+        {
+            auto& f = functions.emplace_back();
+            f.base = fn.BeginAddress;
+            f.size = fn.FunctionLength * 4;
+
+            image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
+        }
+    }
+
+    for (const auto& section : image.sections)
+    {
+        if (!(section.flags & SectionFlags_Code))
+        {
+            continue;
+        }
+        size_t base = section.base;
+        uint8_t* data = section.data;
+        uint8_t* dataEnd = section.data + section.size;
+
+        while (data < dataEnd)
+        {
+            uint32_t insn = std::byteswap(*(uint32_t*)data);
+            if (PPC_OP(insn) == PPC_OP_B && PPC_BL(insn))
+            {
+                size_t address = base + (data - section.data) + PPC_BI(insn);
+
+                if (address >= section.base && address < section.base + section.size && image.symbols.find(address) == image.symbols.end())
+                {
+                    auto data = section.data + address - section.base;
+                    auto& fn = functions.emplace_back(Function::Analyze(data, section.base + section.size - address, address));
+                    image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+                }
+            }
+            data += 4;
+        }
+
+        data = section.data;
+
+        while (data < dataEnd)
+        {
+            auto invalidInstr = config.invalidInstructions.find(std::byteswap(*(uint32_t*)data));
+            if (invalidInstr != config.invalidInstructions.end())
+            {
+                base += invalidInstr->second;
+                data += invalidInstr->second;
+                continue;
+            }
+
+            auto fnSymbol = image.symbols.find(base);
+            if (fnSymbol != image.symbols.end() && fnSymbol->address == base && fnSymbol->type == Symbol_Function)
+            {
+                assert(fnSymbol->address == base);
+
+                base += fnSymbol->size;
+                data += fnSymbol->size;
+            }
+            else
+            {
+                auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
+                image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+
+                base += fn.size;
+                data += fn.size;
+            }
+        }
+    }
+
+    std::sort(functions.begin(), functions.end(), [](auto& lhs, auto& rhs) { return lhs.base < rhs.base; });
 }
 
 bool Recompiler::Recompile(
     const Function& fn,
     uint32_t base,
     const ppc_insn& insn,
-    std::unordered_map<size_t, SwitchTable>::iterator& switchTable,
+    std::unordered_map<uint32_t, RecompilerSwitchTable>::iterator& switchTable,
     RecompilerLocalVariables& localVariables,
     CSRState& csrState)
 {
@@ -141,11 +264,11 @@ bool Recompiler::Recompile(
 
     auto printFunctionCall = [&](uint32_t address)
         {
-            if (address == longJmpAddress)
+            if (address == config.longJmpAddress)
             {
                 println("\tlongjmp(*reinterpret_cast<jmp_buf*>(base + {}.u32), {}.s32);", r(3), r(4));
             }
-            else if (address == setJmpAddress)
+            else if (address == config.setJmpAddress)
             {
                 println("\t{} = ctx;", env());
                 println("\t{}.s64 = setjmp(*reinterpret_cast<jmp_buf*>(base + {}.u32));", r(3), r(3));
@@ -292,7 +415,7 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_BCTR:
-        if (switchTable != switchTables.end())
+        if (switchTable != config.switchTables.end())
         {
             println("\tswitch ({}.u64) {{", r(switchTable->second.r));
 
@@ -316,7 +439,7 @@ bool Recompiler::Recompile(
             println("\t\t__builtin_unreachable();");
             println("\t}}");
 
-            switchTable = switchTables.end();
+            switchTable = config.switchTables.end();
         }
         else
         {
@@ -1963,8 +2086,8 @@ bool Recompiler::Recompile(const Function& fn)
                 labels.emplace(addr + PPC_BD(instruction));
         }
 
-        auto switchTable = switchTables.find(addr);
-        if (switchTable != switchTables.end())
+        auto switchTable = config.switchTables.find(addr);
+        if (switchTable != config.switchTables.end())
         {
             for (auto label : switchTable->second.labels)
                 labels.emplace(label);
@@ -1986,7 +2109,7 @@ bool Recompiler::Recompile(const Function& fn)
     println("PPC_FUNC_IMPL(__imp__{}) {{", name);
     println("\tPPC_FUNC_PROLOGUE();");
 
-    auto switchTable = switchTables.end();
+    auto switchTable = config.switchTables.end();
     bool allRecompiled = true;
     CSRState csrState = CSRState::Unknown;
 
@@ -2010,8 +2133,8 @@ bool Recompiler::Recompile(const Function& fn)
             csrState = CSRState::Unknown;
         }
 
-        if (switchTable == switchTables.end())
-            switchTable = switchTables.find(base);
+        if (switchTable == config.switchTables.end())
+            switchTable = config.switchTables.find(base);
 
         ppc::Disassemble(data, 4, base, insn);
 
@@ -2025,7 +2148,7 @@ bool Recompiler::Recompile(const Function& fn)
         }
         else
         {
-            if (insn.opcode->id == PPC_INST_BCTR && (*(data - 1) == 0x07008038 || *(data - 1) == 0x00000060) && switchTable == switchTables.end())
+            if (insn.opcode->id == PPC_INST_BCTR && (*(data - 1) == 0x07008038 || *(data - 1) == 0x00000060) && switchTable == config.switchTables.end())
                 std::println("Found a switch jump table at {:X} with no switch table entry present", base);
 
             if (!Recompile(fn, base, insn, switchTable, localVariables, csrState))
@@ -2095,7 +2218,7 @@ bool Recompiler::Recompile(const Function& fn)
     return allRecompiled;
 }
 
-void Recompiler::Recompile(const char* directoryPath)
+void Recompiler::Recompile()
 {
     out.reserve(10 * 1024 * 1024);
 
@@ -2124,16 +2247,16 @@ void Recompiler::Recompile(const char* directoryPath)
 
         println("\n#endif");
 
-        SaveCurrentOutData(directoryPath, "ppc_config.h");
+        SaveCurrentOutData("ppc_config.h");
     }
 
     {
         println("#pragma once");
 
-        println("#include \"ppc_config.h\"");
+        println("#include \"ppc_config.h\"\n");
         println("{}", std::string_view{gPPCContextText, gPPCContextText_SIZE});
 
-        SaveCurrentOutData(directoryPath, "ppc_context.h");
+        SaveCurrentOutData("ppc_context.h");
     }
 
     {
@@ -2144,7 +2267,7 @@ void Recompiler::Recompile(const char* directoryPath)
         for (auto& symbol : image.symbols)
             println("PPC_EXTERN_FUNC({});", symbol.name);
 
-        SaveCurrentOutData(directoryPath, "ppc_recomp_shared.h");
+        SaveCurrentOutData("ppc_recomp_shared.h");
     }
 
     {
@@ -2157,14 +2280,14 @@ void Recompiler::Recompile(const char* directoryPath)
         println("\t{{ 0, nullptr }}");
         println("}};");
 
-        SaveCurrentOutData(directoryPath, "ppc_func_mapping.cpp");
+        SaveCurrentOutData("ppc_func_mapping.cpp");
     }
 
     for (size_t i = 0; i < functions.size(); i++)
     {
         if ((i % 256) == 0)
         {
-            SaveCurrentOutData(directoryPath);
+            SaveCurrentOutData();
             println("#include \"ppc_recomp_shared.h\"\n");
         }
 
@@ -2174,10 +2297,10 @@ void Recompiler::Recompile(const char* directoryPath)
         Recompile(functions[i]);
     }
 
-    SaveCurrentOutData(directoryPath);
+    SaveCurrentOutData();
 }
 
-void Recompiler::SaveCurrentOutData(const char* directoryPath, const std::string_view& name)
+void Recompiler::SaveCurrentOutData(const std::string_view& name)
 {
     if (!out.empty())
     {
@@ -2192,7 +2315,7 @@ void Recompiler::SaveCurrentOutData(const char* directoryPath, const std::string
         bool shouldWrite = true;
 
         // Check if an identical file already exists first to not trigger recompilation
-        std::string filePath = std::format("{}/{}", directoryPath, name.empty() ? cppName : name);
+        std::string filePath = std::format("{}/{}/{}", config.directoryPath, config.outDirectoryPath, name.empty() ? cppName : name);
         FILE* f = fopen(filePath.c_str(), "rb");
         if (f)
         {

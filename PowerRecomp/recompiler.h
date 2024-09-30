@@ -1,11 +1,7 @@
 #pragma once
-#include "pch.h"
 
-struct SwitchTable
-{
-    size_t r;
-    std::vector<size_t> labels;
-};
+#include "pch.h"
+#include "recompiler_config.h"
 
 struct RecompilerLocalVariables
 {
@@ -22,18 +18,6 @@ struct RecompilerLocalVariables
     bool ea{};
 };
 
-struct RecompilerConfig
-{
-    bool skipLr = false;
-    bool ctrAsLocalVariable = false;
-    bool xerAsLocalVariable = false;
-    bool reservedRegisterAsLocalVariable = false;
-    bool skipMsr = false;
-    bool crRegistersAsLocalVariables = false;
-    bool nonArgumentRegistersAsLocalVariables = false;
-    bool nonVolatileRegistersAsLocalVariables = false;
-};
-
 enum class CSRState
 {
     Unknown,
@@ -45,15 +29,11 @@ struct Recompiler
 {
     Image image;
     std::vector<Function> functions;
-    std::unordered_map<size_t, SwitchTable> switchTables;
     std::string out;
     size_t cppFileIndex = 0;
-    uint32_t setJmpAddress = 0;
-    uint32_t longJmpAddress = 0;
     RecompilerConfig config;
 
-    void LoadSwitchTables(const char* filePath);
-    void LoadExecutable(const char* filePath);
+    void LoadConfig(const std::string_view& configFilePath);
 
     template<class... Args>
     void print(std::format_string<Args...> fmt, Args&&... args)
@@ -68,18 +48,20 @@ struct Recompiler
         out += '\n';
     }
 
+    void Analyse();
+
     // TODO: make a RecompileArgs struct instead this is getting messy
     bool Recompile(
         const Function& fn,
         uint32_t base,
         const ppc_insn& insn, 
-        std::unordered_map<size_t, SwitchTable>::iterator& switchTable, 
+        std::unordered_map<uint32_t, RecompilerSwitchTable>::iterator& switchTable,
         RecompilerLocalVariables& localVariables,
         CSRState& csrState);
 
     bool Recompile(const Function& fn);
 
-    void Recompile(const char* directoryPath);
+    void Recompile();
 
-    void SaveCurrentOutData(const char* directoryPath, const std::string_view& name = std::string_view());
+    void SaveCurrentOutData(const std::string_view& name = std::string_view());
 };
