@@ -14,8 +14,12 @@
 #include <intrin.h>
 #include <x86intrin.h>
 
+#define PPC_JOIN(x, y) x##y
+#define PPC_XSTRINGIFY(x) #x
+#define PPC_STRINGIFY(x) PPC_XSTRINGIFY(x)
 #define PPC_FUNC(x) void x(PPCContext& __restrict ctx, uint8_t* base)
-#define PPC_EXTERN_FUNC(x) extern PPC_FUNC(x)
+#define PPC_FUNC_IMPL(x) extern "C" PPC_FUNC(x)
+#define PPC_EXTERN_FUNC(x) extern "C" PPC_FUNC(x)
 #define PPC_WEAK_FUNC(x) __attribute__((weak,noinline)) PPC_FUNC(x)
 
 #define PPC_FUNC_PROLOGUE() __builtin_assume(((size_t)base & 0xFFFFFFFF) == 0)

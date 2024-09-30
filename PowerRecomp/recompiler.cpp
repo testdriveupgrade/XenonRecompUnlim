@@ -1972,15 +1972,18 @@ bool Recompiler::Recompile(const Function& fn)
     }
 
     auto symbol = image.symbols.find(fn.base);
+    std::string name;
     if (symbol != image.symbols.end())
     {
-        println("PPC_WEAK_FUNC({}) {{", symbol->name);
+        name = symbol->name;
     }
     else
     {
-        println("PPC_WEAK_FUNC(sub_{}) {{", fn.base);
+        name = std::format("sub_{}", fn.base);
     }
 
+    println("__attribute__((alias(\"__imp__{}\"))) PPC_WEAK_FUNC({});", name, name);
+    println("PPC_FUNC_IMPL(__imp__{}) {{", name);
     println("\tPPC_FUNC_PROLOGUE();");
 
     auto switchTable = switchTables.end();
