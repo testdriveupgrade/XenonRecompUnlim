@@ -144,7 +144,7 @@ inline static const T* Xex2FindOptionalHeader(const void* base, const XEX_OPTION
     {
         if (headers[i].Type == (uint32_t)type)
         {
-            if ((type & 0xFF) == 1)
+            if ((type & 0xFF) == 0)
             {
                 return reinterpret_cast<const T*>(&headers[i].Address);
             }
