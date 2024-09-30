@@ -11,6 +11,7 @@ endif()
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+include("cmake/bin2h.cmake")
 include(FetchContent)
 FetchContent_Declare(
     tomlplusplus
@@ -27,12 +28,15 @@ FetchContent_MakeAvailable(tomlplusplus)
 FetchContent_MakeAvailable(xxHash)
 
 add_subdirectory(${THIRDPARTY_ROOT}/disasm)
+set(POWERANALYSE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerAnalyse)
+set(POWERRECOMP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerRecomp)
+set(POWERUTILS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerUtils)
 
 project ("PowerRecomp-ALL")
 
-add_subdirectory(PowerAnalyse)
-add_subdirectory(PowerRecomp)
-add_subdirectory(PowerUtils)
+add_subdirectory(${POWERANALYSE_ROOT})
+add_subdirectory(${POWERRECOMP_ROOT})
+add_subdirectory(${POWERUTILS_ROOT})
 
 # Only build sample and tests if this is the top level project
 if (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR})

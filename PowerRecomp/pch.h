@@ -19,3 +19,4 @@
 #include <unordered_set>
 #include <xbox.h>
 #include <xxhash.h>
+#include "generated/ppc_context.gen.h"

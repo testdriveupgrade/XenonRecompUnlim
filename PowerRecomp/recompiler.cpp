@@ -2097,7 +2097,7 @@ void Recompiler::Recompile(const char* directoryPath)
     out.reserve(10 * 1024 * 1024);
 
     {
-        println("#pragma once\n");
+        println("#pragma once");
 
         println("#ifndef PPC_CONFIG_H_INCLUDED");
         println("#define PPC_CONFIG_H_INCLUDED\n");
@@ -2125,9 +2125,18 @@ void Recompiler::Recompile(const char* directoryPath)
     }
 
     {
+        println("#pragma once");
+
+        println("#include \"ppc_config.h\"");
+        println("{}", std::string_view{gPPCContextText, gPPCContextText_SIZE});
+
+        SaveCurrentOutData(directoryPath, "ppc_context.h");
+    }
+
+    {
         println("#pragma once\n");
         println("#include \"ppc_config.h\"");
-        println("#include <ppc_context.h>\n");
+        println("#include \"ppc_context.h\"\n");
 
         for (auto& symbol : image.symbols)
             println("PPC_EXTERN_FUNC({});", symbol.name);
