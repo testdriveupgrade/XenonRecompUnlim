@@ -33,5 +33,9 @@ project ("PowerRecomp-ALL")
 add_subdirectory(PowerAnalyse)
 add_subdirectory(PowerRecomp)
 add_subdirectory(PowerUtils)
-add_subdirectory(PowerSample)
-add_subdirectory(PowerTests)
+
+# Only build sample and tests if this is the top level project
+if (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
+    add_subdirectory(PowerSample)
+    add_subdirectory(PowerTests)
+endif()
