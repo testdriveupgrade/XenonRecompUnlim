@@ -305,6 +305,18 @@ typedef struct _XXOVERLAPPED {
 
 static_assert(sizeof(_XXOVERLAPPED) == 0x1C);
 
+// https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-memorystatus
+typedef struct _XMEMORYSTATUS {
+    XDWORD dwLength;
+    XDWORD dwMemoryLoad;
+    XDWORD dwTotalPhys;
+    XDWORD dwAvailPhys;
+    XDWORD dwTotalPageFile;
+    XDWORD dwAvailPageFile;
+    XDWORD dwTotalVirtual;
+    XDWORD dwAvailVirtual;
+} XMEMORYSTATUS, * XLPMEMORYSTATUS;
+
 typedef struct _XVIDEO_MODE
 {
     be<uint32_t> DisplayWidth;
@@ -374,6 +386,9 @@ typedef struct _XDEVICE_DATA
 } XDEVICE_DATA, *PXDEVICE_DATA;
 
 // Direct reflection of XInput structures
+
+#define XAMINPUT_DEVTYPE_GAMEPAD          0x01
+#define XAMINPUT_DEVSUBTYPE_GAMEPAD       0x01
 
 #define XAMINPUT_GAMEPAD_DPAD_UP          0x0001
 #define XAMINPUT_GAMEPAD_DPAD_DOWN        0x0002
