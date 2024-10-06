@@ -73,4 +73,20 @@ void RecompilerConfig::Load(const std::string_view& configFilePath)
             }
         }
     }
+
+    if (auto midAsmHookArray = toml["midasm_hook"].as_array())
+    {
+        for (auto& entry : *midAsmHookArray)
+        {
+            auto& table = *entry.as_table();
+
+            RecompilerMidAsmHook midAsmHook;
+            midAsmHook.name = *table["name"].value<std::string>();
+            for (auto& reg : *table["registers"].as_array())
+            {
+                midAsmHook.registers.push_back(*reg.value<std::string>());
+            }
+            midAsmHooks.emplace(*table["address"].value<uint32_t>(), std::move(midAsmHook));
+        }
+    }
 }

@@ -325,6 +325,51 @@ bool Recompiler::Recompile(
             }
         };
 
+    auto midAsmHook = config.midAsmHooks.find(base);
+    if (midAsmHook != config.midAsmHooks.end())
+    {
+        print("\t{}(", midAsmHook->second.name);
+        for (auto& reg : midAsmHook->second.registers)
+        {
+            if (out.back() != '(')
+                out += ", ";
+
+            switch (reg[0])
+            {
+            case 'c':
+                if (reg == "ctr")
+                    out += ctr();
+                else
+                    out += cr(std::atoi(reg.c_str() + 2));
+                break;
+
+            case 'x':
+                out += xer();
+                break;
+
+            case 'r':
+                if (reg == "reserved")
+                    out += reserved();
+                else
+                    out += r(std::atoi(reg.c_str() + 1));
+                break;
+
+            case 'f':
+                if (reg == "fpscr")
+                    out += "ctx.fpscr";
+                else
+                    out += f(std::atoi(reg.c_str() + 1));
+                break;
+
+            case 'v':
+                out += v(std::atoi(reg.c_str() + 1));
+                break;
+            }
+        }
+
+        println(");");
+    }
+
     int id = insn.opcode->id;
 
     // Handling instructions that don't disassemble correctly for some reason here
@@ -2091,6 +2136,48 @@ bool Recompiler::Recompile(const Function& fn)
         {
             for (auto label : switchTable->second.labels)
                 labels.emplace(label);
+        }
+
+        auto midAsmHook = config.midAsmHooks.find(addr);
+        if (midAsmHook != config.midAsmHooks.end())
+        {
+            print("extern void {}(", midAsmHook->second.name);
+            for (auto& reg : midAsmHook->second.registers)
+            {
+                if (out.back() != '(')
+                    out += ", ";
+
+                switch (reg[0])
+                {
+                case 'c':
+                    if (reg == "ctr")
+                        print("PPCRegister& ctr");
+                    else
+                        print("PPCCRRegister& {}", reg);
+                    break;
+
+                case 'x':
+                    print("PPCXERRegister& xer");
+                    break;
+
+                case 'r':
+                    print("PPCRegister& {}", reg);
+                    break;
+
+                case 'f':
+                    if (reg == "fpscr")
+                        print("PPCFPSCRRegister& fpscr");
+                    else
+                        print("PPCRegister& {}", reg);
+                    break;
+
+                case 'v':
+                    print("PPCVRegister& {}", reg);
+                    break;
+                }
+            }
+
+            println(");\n");
         }
     }
 

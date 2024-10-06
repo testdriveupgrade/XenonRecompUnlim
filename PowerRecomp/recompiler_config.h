@@ -6,6 +6,12 @@ struct RecompilerSwitchTable
     std::vector<uint32_t> labels;
 };
 
+struct RecompilerMidAsmHook
+{
+    std::string name;
+    std::vector<std::string> registers;
+};
+
 struct RecompilerConfig
 {
     std::string directoryPath;
@@ -33,6 +39,7 @@ struct RecompilerConfig
     uint32_t setJmpAddress = 0;
     std::unordered_map<uint32_t, uint32_t> functions;
     std::unordered_map<uint32_t, uint32_t> invalidInstructions;
+    std::unordered_map<uint32_t, RecompilerMidAsmHook> midAsmHooks;
 
     void Load(const std::string_view& configFilePath);
 };
