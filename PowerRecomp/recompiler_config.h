@@ -10,6 +10,14 @@ struct RecompilerMidAsmHook
 {
     std::string name;
     std::vector<std::string> registers;
+
+    bool ret = false;
+    bool returnOnTrue = false;
+    bool returnOnFalse = false;
+
+    uint32_t jumpAddress = 0;
+    uint32_t jumpAddressOnTrue = 0;
+    uint32_t jumpAddressOnFalse = 0;
 };
 
 struct RecompilerConfig

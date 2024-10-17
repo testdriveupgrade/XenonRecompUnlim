@@ -328,7 +328,14 @@ bool Recompiler::Recompile(
     auto midAsmHook = config.midAsmHooks.find(base);
     if (midAsmHook != config.midAsmHooks.end())
     {
-        print("\t{}(", midAsmHook->second.name);
+        bool returnsBool = midAsmHook->second.returnOnFalse || midAsmHook->second.returnOnTrue ||
+            midAsmHook->second.jumpAddressOnFalse != NULL || midAsmHook->second.jumpAddressOnTrue != NULL;
+
+        print("\t");
+        if (returnsBool)
+            print("if (");
+
+        print("{}(", midAsmHook->second.name);
         for (auto& reg : midAsmHook->second.registers)
         {
             if (out.back() != '(')
@@ -367,7 +374,35 @@ bool Recompiler::Recompile(
             }
         }
 
-        println(");");
+        if (returnsBool)
+        {
+            println(")) {{");
+
+            if (midAsmHook->second.returnOnTrue)
+                println("\t\treturn;");
+            else if (midAsmHook->second.jumpAddressOnTrue != NULL)
+                println("\t\tgoto loc_{:X};", midAsmHook->second.jumpAddressOnTrue);
+
+            println("\t}}");
+
+            println("\telse {{");
+
+            if (midAsmHook->second.returnOnFalse)
+                println("\t\treturn;");
+            else if (midAsmHook->second.jumpAddressOnFalse != NULL)
+                println("\t\tgoto loc_{:X};", midAsmHook->second.jumpAddressOnFalse);
+
+            println("\t}}");
+        }
+        else
+        {
+            println(");");
+
+            if (midAsmHook->second.ret)
+                println("\treturn;");
+            else if (midAsmHook->second.jumpAddress != NULL)
+                println("\tgoto loc_{:X};", midAsmHook->second.jumpAddress);
+        }
     }
 
     int id = insn.opcode->id;
@@ -2141,7 +2176,17 @@ bool Recompiler::Recompile(const Function& fn)
         auto midAsmHook = config.midAsmHooks.find(addr);
         if (midAsmHook != config.midAsmHooks.end())
         {
-            print("extern void {}(", midAsmHook->second.name);
+            if (midAsmHook->second.returnOnFalse || midAsmHook->second.returnOnTrue ||
+                midAsmHook->second.jumpAddressOnFalse != NULL || midAsmHook->second.jumpAddressOnTrue != NULL)
+            {
+                print("extern bool ");
+            }
+            else
+            {
+                print("extern void ");
+            }
+
+            print("{}(", midAsmHook->second.name);
             for (auto& reg : midAsmHook->second.registers)
             {
                 if (out.back() != '(')
@@ -2178,6 +2223,13 @@ bool Recompiler::Recompile(const Function& fn)
             }
 
             println(");\n");
+
+            if (midAsmHook->second.jumpAddress != NULL)
+                labels.emplace(midAsmHook->second.jumpAddress);       
+            if (midAsmHook->second.jumpAddressOnTrue != NULL)
+                labels.emplace(midAsmHook->second.jumpAddressOnTrue);    
+            if (midAsmHook->second.jumpAddressOnFalse != NULL)
+                labels.emplace(midAsmHook->second.jumpAddressOnFalse);
         }
     }
 

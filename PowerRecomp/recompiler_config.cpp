@@ -82,10 +82,34 @@ void RecompilerConfig::Load(const std::string_view& configFilePath)
 
             RecompilerMidAsmHook midAsmHook;
             midAsmHook.name = *table["name"].value<std::string>();
-            for (auto& reg : *table["registers"].as_array())
+            if (auto registerArray = table["registers"].as_array())
             {
-                midAsmHook.registers.push_back(*reg.value<std::string>());
+                for (auto& reg : *registerArray)
+                    midAsmHook.registers.push_back(*reg.value<std::string>());
             }
+
+            midAsmHook.ret = table["return"].value_or(false);
+            midAsmHook.returnOnTrue = table["return_on_true"].value_or(false);
+            midAsmHook.returnOnFalse = table["return_on_false"].value_or(false);
+
+            midAsmHook.jumpAddress = table["jump_address"].value_or(0u);
+            midAsmHook.jumpAddressOnTrue = table["jump_address_on_true"].value_or(0u);
+            midAsmHook.jumpAddressOnFalse = table["jump_address_on_false"].value_or(0u);
+
+            if ((midAsmHook.ret && midAsmHook.jumpAddress != NULL) ||
+                (midAsmHook.returnOnTrue && midAsmHook.jumpAddressOnTrue != NULL) ||
+                (midAsmHook.returnOnFalse && midAsmHook.jumpAddressOnFalse != NULL))
+            {
+                std::println("{}: can't return and jump at the same time", midAsmHook.name);
+            }
+
+            if ((midAsmHook.ret || midAsmHook.jumpAddress != NULL) &&
+                (midAsmHook.returnOnFalse != NULL || midAsmHook.returnOnTrue != NULL ||
+                    midAsmHook.jumpAddressOnFalse != NULL || midAsmHook.jumpAddressOnTrue != NULL))
+            {
+                std::println("{}: can't mix direct and conditional return/jump", midAsmHook.name);
+            }
+
             midAsmHooks.emplace(*table["address"].value<uint32_t>(), std::move(midAsmHook));
         }
     }
