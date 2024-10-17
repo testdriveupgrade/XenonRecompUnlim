@@ -37,16 +37,17 @@ endfunction()
 #   VARIABLE_NAME   - The name of the variable for the byte array. The string "_SIZE" will be append
 #                     to this name and will be used a variable name for size variable.
 #   HEADER_FILE     - The path of header file.
+#   ARRAY_TYPE      - The type of each element of the array in the header file.
 #   APPEND          - If specified appends to the header file instead of overwriting it
 #   NULL_TERMINATE  - If specified a null byte(zero) will be append to the byte array. This will be
 #                     useful if the source file is a text file and we want to use the file contents
 #                     as string. But the size variable holds size of the byte array without this
 #                     null byte.
 # Usage:
-#   bin2h(SOURCE_FILE "Logo.png" HEADER_FILE "Logo.h" VARIABLE_NAME "LOGO_PNG")
+#   bin2h(SOURCE_FILE "Logo.png" HEADER_FILE "Logo.h" ARRAY_TYPE "char" VARIABLE_NAME "LOGO_PNG")
 function(BIN2H)
     set(options APPEND NULL_TERMINATE)
-    set(oneValueArgs SOURCE_FILE VARIABLE_NAME HEADER_FILE)
+    set(oneValueArgs SOURCE_FILE VARIABLE_NAME HEADER_FILE ARRAY_TYPE)
     cmake_parse_arguments(BIN2H "${options}" "${oneValueArgs}" "" ${ARGN})
 
     # reads source file contents as hex string
@@ -71,8 +72,8 @@ function(BIN2H)
     string(MAKE_C_IDENTIFIER "${BIN2H_VARIABLE_NAME}" BIN2H_VARIABLE_NAME)
 
     # declares byte array and the length variables
-    set(arrayDefinition "const char ${BIN2H_VARIABLE_NAME}[] = { ${arrayValues} };")
-    set(arraySizeDefinition "const size_t ${BIN2H_VARIABLE_NAME}_SIZE = ${arraySize};")
+    set(arrayDefinition "const ${BIN2H_ARRAY_TYPE} ${BIN2H_VARIABLE_NAME}[] = { ${arrayValues} };")
+    set(arraySizeDefinition "const size_t ${BIN2H_VARIABLE_NAME}_size = ${arraySize};")
 
     set(declarations "${arrayDefinition}\n\n${arraySizeDefinition}\n\n")
     if(BIN2H_APPEND)

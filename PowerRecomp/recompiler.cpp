@@ -2393,7 +2393,7 @@ void Recompiler::Recompile()
         println("#pragma once");
 
         println("#include \"ppc_config.h\"\n");
-        println("{}", std::string_view{gPPCContextText, gPPCContextText_SIZE});
+        println("{}", std::string_view{g_PPCContextText, g_PPCContextText_size});
 
         SaveCurrentOutData("ppc_context.h");
     }
