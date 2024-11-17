@@ -24,15 +24,15 @@
 
 #define PPC_FUNC_PROLOGUE() __builtin_assume(((size_t)base & 0xFFFFFFFF) == 0)
 
-#define PPC_LOAD_U8(x) *(uint8_t*)(base + (x))
-#define PPC_LOAD_U16(x) __builtin_bswap16(*(uint16_t*)(base + (x)))
-#define PPC_LOAD_U32(x) __builtin_bswap32(*(uint32_t*)(base + (x)))
-#define PPC_LOAD_U64(x) __builtin_bswap64(*(uint64_t*)(base + (x)))
+#define PPC_LOAD_U8(x) *(volatile uint8_t*)(base + (x))
+#define PPC_LOAD_U16(x) __builtin_bswap16(*(volatile uint16_t*)(base + (x)))
+#define PPC_LOAD_U32(x) __builtin_bswap32(*(volatile uint32_t*)(base + (x)))
+#define PPC_LOAD_U64(x) __builtin_bswap64(*(volatile uint64_t*)(base + (x)))
 
-#define PPC_STORE_U8(x, y) *(uint8_t*)(base + (x)) = (y)
-#define PPC_STORE_U16(x, y) *(uint16_t*)(base + (x)) = __builtin_bswap16(y)
-#define PPC_STORE_U32(x, y) *(uint32_t*)(base + (x)) = __builtin_bswap32(y)
-#define PPC_STORE_U64(x, y) *(uint64_t*)(base + (x)) = __builtin_bswap64(y)
+#define PPC_STORE_U8(x, y) *(volatile uint8_t*)(base + (x)) = (y)
+#define PPC_STORE_U16(x, y) *(volatile uint16_t*)(base + (x)) = __builtin_bswap16(y)
+#define PPC_STORE_U32(x, y) *(volatile uint32_t*)(base + (x)) = __builtin_bswap32(y)
+#define PPC_STORE_U64(x, y) *(volatile uint64_t*)(base + (x)) = __builtin_bswap64(y)
 
 #define PPC_CALL_FUNC(x) x(ctx, base)
 #define PPC_CALL_INDIRECT_FUNC(x) (*(PPCFunc**)(ctx.fn + uint64_t(x) * 2))(ctx, base)

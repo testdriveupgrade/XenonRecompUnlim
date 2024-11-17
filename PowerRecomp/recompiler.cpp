@@ -2265,9 +2265,6 @@ bool Recompiler::Recompile(const Function& fn)
         {
             println("loc_{:X}:", base);
 
-            // With a read barrier we prevent the compiler from doing unsafe code reordering. I wonder if we could do this better...
-            println("\t_ReadBarrier();");
-
             // Anyone could jump to this label so we wouldn't know what the CSR state would be.
             csrState = CSRState::Unknown;
         }
