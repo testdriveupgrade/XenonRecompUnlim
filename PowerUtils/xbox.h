@@ -89,6 +89,11 @@ struct be
             const uint32_t swapped = std::byteswap(*reinterpret_cast<uint32_t*>(&value));
             return *reinterpret_cast<const T*>(&swapped);
         }
+        else if constexpr (std::is_enum_v<T>)
+        {
+            const std::underlying_type_t<T> swapped = std::byteswap(*reinterpret_cast<std::underlying_type_t<T>*>(&value));
+            return *reinterpret_cast<const T*>(&swapped);
+        }
         else
         {
             return std::byteswap(value);
