@@ -2388,6 +2388,12 @@ void Recompiler::Recompile()
         if (config.nonVolatileRegistersAsLocalVariables)
             println("#define PPC_CONFIG_NON_VOLATILE_AS_LOCAL");
 
+        println("");
+
+        println("#ifdef PPC_INCLUDE_DETAIL");
+        println("#include \"ppc_detail.h\"");
+        println("#endif");
+
         println("\n#endif");
 
         SaveCurrentOutData("ppc_config.h");

@@ -24,34 +24,83 @@
 
 #define PPC_FUNC_PROLOGUE() __builtin_assume(((size_t)base & 0xFFFFFFFF) == 0)
 
+#ifndef PPC_LOAD_U8
 #define PPC_LOAD_U8(x) *(volatile uint8_t*)(base + (x))
+#endif
+
+#ifndef PPC_LOAD_U16
 #define PPC_LOAD_U16(x) __builtin_bswap16(*(volatile uint16_t*)(base + (x)))
+#endif
+
+#ifndef PPC_LOAD_U32
 #define PPC_LOAD_U32(x) __builtin_bswap32(*(volatile uint32_t*)(base + (x)))
+#endif
+
+#ifndef PPC_LOAD_U64
 #define PPC_LOAD_U64(x) __builtin_bswap64(*(volatile uint64_t*)(base + (x)))
+#endif
 
 // TODO: Implement.
 // These are currently unused. However, MMIO loads could possibly be handled statically with some profiling and a fallback.
 // The fallback would be a runtime exception handler which will intercept reads from MMIO regions 
 // and log the PC for compiling to static code later.
+#ifndef PPC_MM_LOAD_U8
 #define PPC_MM_LOAD_U8(x)  PPC_LOAD_U8 (x)
-#define PPC_MM_LOAD_U16(x) PPC_LOAD_U16(x)
-#define PPC_MM_LOAD_U32(x) PPC_LOAD_U32(x)
-#define PPC_MM_LOAD_U64(x) PPC_LOAD_U64(x)
+#endif
 
+#ifndef PPC_MM_LOAD_U16
+#define PPC_MM_LOAD_U16(x) PPC_LOAD_U16(x)
+#endif
+
+#ifndef PPC_MM_LOAD_U32
+#define PPC_MM_LOAD_U32(x) PPC_LOAD_U32(x)
+#endif
+
+#ifndef PPC_MM_LOAD_U64
+#define PPC_MM_LOAD_U64(x) PPC_LOAD_U64(x)
+#endif
+
+#ifndef PPC_STORE_U8
 #define PPC_STORE_U8(x, y) *(volatile uint8_t*)(base + (x)) = (y)
+#endif
+
+#ifndef PPC_STORE_U16
 #define PPC_STORE_U16(x, y) *(volatile uint16_t*)(base + (x)) = __builtin_bswap16(y)
+#endif
+
+#ifndef PPC_STORE_U32
 #define PPC_STORE_U32(x, y) *(volatile uint32_t*)(base + (x)) = __builtin_bswap32(y)
+#endif
+
+#ifndef PPC_STORE_U64
 #define PPC_STORE_U64(x, y) *(volatile uint64_t*)(base + (x)) = __builtin_bswap64(y)
+#endif
 
 // MMIO Store handling is completely reliant on being preeceded by eieio.
 // TODO: Verify if that's always the case.
+#ifndef PPC_MM_STORE_U8
 #define PPC_MM_STORE_U8(x, y)   PPC_STORE_U8 (x, y)
-#define PPC_MM_STORE_U16(x, y)  PPC_STORE_U16(x, y)
-#define PPC_MM_STORE_U32(x, y)  PPC_STORE_U32(x, y)
-#define PPC_MM_STORE_U64(x, y)  PPC_STORE_U64(x, y)
+#endif
 
+#ifndef PPC_MM_STORE_U16
+#define PPC_MM_STORE_U16(x, y)  PPC_STORE_U16(x, y)
+#endif
+
+#ifndef PPC_MM_STORE_U32
+#define PPC_MM_STORE_U32(x, y)  PPC_STORE_U32(x, y)
+#endif
+
+#ifndef PPC_MM_STORE_U64
+#define PPC_MM_STORE_U64(x, y)  PPC_STORE_U64(x, y)
+#endif
+
+#ifndef PPC_CALL_FUNC
 #define PPC_CALL_FUNC(x) x(ctx, base)
+#endif
+
+#ifndef PPC_CALL_INDIRECT_FUNC
 #define PPC_CALL_INDIRECT_FUNC(x) (*(PPCFunc**)(ctx.fn + uint64_t(x) * 2))(ctx, base)
+#endif
 
 typedef void PPCFunc(struct PPCContext& __restrict__ ctx, uint8_t* base);
 
