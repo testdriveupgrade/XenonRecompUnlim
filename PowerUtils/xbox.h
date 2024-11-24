@@ -140,9 +140,12 @@ struct xpointer
 {
     be<uint32_t> ptr;
 
+    xpointer() : ptr(0)
+    {
+    }
+
     xpointer(T* ptr) : ptr((uint32_t)ptr)
     {
-
     }
 
     T* get() const
