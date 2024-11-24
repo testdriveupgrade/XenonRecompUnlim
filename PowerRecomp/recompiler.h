@@ -27,6 +27,8 @@ enum class CSRState
 
 struct Recompiler
 {
+    // Enforce In-order Execution of I/O constant for quick comparison
+    static constexpr uint32_t c_eieio = 0xAC06007C;
     Image image;
     std::vector<Function> functions;
     std::string out;
@@ -54,7 +56,8 @@ struct Recompiler
     bool Recompile(
         const Function& fn,
         uint32_t base,
-        const ppc_insn& insn, 
+        const ppc_insn& insn,
+        const uint32_t* data,
         std::unordered_map<uint32_t, RecompilerSwitchTable>::iterator& switchTable,
         RecompilerLocalVariables& localVariables,
         CSRState& csrState);

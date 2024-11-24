@@ -158,6 +158,7 @@ bool Recompiler::Recompile(
     const Function& fn,
     uint32_t base,
     const ppc_insn& insn,
+    const uint32_t* data,
     std::unordered_map<uint32_t, RecompilerSwitchTable>::iterator& switchTable,
     RecompilerLocalVariables& localVariables,
     CSRState& csrState)
@@ -260,6 +261,12 @@ bool Recompiler::Recompile(
         {
             localVariables.ea = true;
             return "ea";
+        };
+
+    // TODO (Sajid): Check for out of bounds access
+    auto mmioStore = [&]() -> bool
+        {
+            return *(data + 1) == c_eieio;
         };
 
     auto printFunctionCall = [&](uint32_t address)
@@ -1362,7 +1369,7 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_STB:
-        print("\tPPC_STORE_U8(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U8(" : "\tPPC_STORE_U8(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{}, {}.u8);", int32_t(insn.operands[1]), r(insn.operands[0]));
@@ -1375,14 +1382,14 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_STBX:
-        print("\tPPC_STORE_U8(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U8(" : "\tPPC_STORE_U8(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u8);", r(insn.operands[2]), r(insn.operands[0]));
         break;
 
     case PPC_INST_STD:
-        print("\tPPC_STORE_U64(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U64(" : "\tPPC_STORE_U64(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{}, {}.u64);", int32_t(insn.operands[1]), r(insn.operands[0]));
@@ -1405,7 +1412,7 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_STDX:
-        print("\tPPC_STORE_U64(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U64(" : "\tPPC_STORE_U64(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u64);", r(insn.operands[2]), r(insn.operands[0]));
@@ -1413,7 +1420,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_STFD:
         printSetFlushMode(false);
-        print("\tPPC_STORE_U64(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U64(" : "\tPPC_STORE_U64(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{}, {}.u64);", int32_t(insn.operands[1]), f(insn.operands[0]));
@@ -1421,7 +1428,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_STFDX:
         printSetFlushMode(false);
-        print("\tPPC_STORE_U64(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U64(" : "\tPPC_STORE_U64(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u64);", r(insn.operands[2]), f(insn.operands[0]));
@@ -1429,7 +1436,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_STFIWX:
         printSetFlushMode(false);
-        print("\tPPC_STORE_U32(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U32(" : "\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u32);", r(insn.operands[2]), f(insn.operands[0]));
@@ -1438,7 +1445,7 @@ bool Recompiler::Recompile(
     case PPC_INST_STFS:
         printSetFlushMode(false);
         println("\t{}.f32 = float({}.f64);", temp(), f(insn.operands[0]));
-        print("\tPPC_STORE_U32(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U32(" : "\tPPC_STORE_U32(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{}, {}.u32);", int32_t(insn.operands[1]), temp());
@@ -1447,28 +1454,28 @@ bool Recompiler::Recompile(
     case PPC_INST_STFSX:
         printSetFlushMode(false);
         println("\t{}.f32 = float({}.f64);", temp(), f(insn.operands[0]));
-        print("\tPPC_STORE_U32(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U32(" : "\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u32);", r(insn.operands[2]), temp());
         break;
 
     case PPC_INST_STH:
-        print("\tPPC_STORE_U16(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U16(" : "\tPPC_STORE_U16(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{}, {}.u16);", int32_t(insn.operands[1]), r(insn.operands[0]));
         break;
 
     case PPC_INST_STHBRX:
-        print("\tPPC_STORE_U16(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U16(" : "\tPPC_STORE_U16(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, __builtin_bswap16({}.u16));", r(insn.operands[2]), r(insn.operands[0]));
         break;
 
     case PPC_INST_STHX:
-        print("\tPPC_STORE_U16(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U16(" : "\tPPC_STORE_U16(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u16);", r(insn.operands[2]), r(insn.operands[0]));
@@ -1530,14 +1537,14 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_STW:
-        print("\tPPC_STORE_U32(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U32(" : "\tPPC_STORE_U32(");
         if (insn.operands[2] != 0)
             print("{}.u32 + ", r(insn.operands[2]));
         println("{}, {}.u32);", int32_t(insn.operands[1]), r(insn.operands[0]));
         break;
 
     case PPC_INST_STWBRX:
-        print("\tPPC_STORE_U32(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U32(" : "\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, __builtin_bswap32({}.u32));", r(insn.operands[2]), r(insn.operands[0]));
@@ -1566,7 +1573,7 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_STWX:
-        print("\tPPC_STORE_U32(");
+        print("{}", mmioStore() ? "\tPPC_MM_STORE_U32(" : "\tPPC_STORE_U32(");
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32, {}.u32);", r(insn.operands[2]), r(insn.operands[0]));
@@ -2287,7 +2294,7 @@ bool Recompiler::Recompile(const Function& fn)
             if (insn.opcode->id == PPC_INST_BCTR && (*(data - 1) == 0x07008038 || *(data - 1) == 0x00000060) && switchTable == config.switchTables.end())
                 std::println("Found a switch jump table at {:X} with no switch table entry present", base);
 
-            if (!Recompile(fn, base, insn, switchTable, localVariables, csrState))
+            if (!Recompile(fn, base, insn, data, switchTable, localVariables, csrState))
             {
                 std::println("Unrecognized instruction at 0x{:X}: {}", base, insn.opcode->name);
                 allRecompiled = false;

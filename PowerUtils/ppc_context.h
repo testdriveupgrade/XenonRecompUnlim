@@ -29,10 +29,26 @@
 #define PPC_LOAD_U32(x) __builtin_bswap32(*(volatile uint32_t*)(base + (x)))
 #define PPC_LOAD_U64(x) __builtin_bswap64(*(volatile uint64_t*)(base + (x)))
 
+// TODO: Implement.
+// These are currently unused. However, MMIO loads could possibly be handled statically with some profiling and a fallback.
+// The fallback would be a runtime exception handler which will intercept reads from MMIO regions 
+// and log the PC for compiling to static code later.
+#define PPC_MM_LOAD_U8(x)  PPC_LOAD_U8 (x)
+#define PPC_MM_LOAD_U16(x) PPC_LOAD_U16(x)
+#define PPC_MM_LOAD_U32(x) PPC_LOAD_U32(x)
+#define PPC_MM_LOAD_U64(x) PPC_LOAD_U64(x)
+
 #define PPC_STORE_U8(x, y) *(volatile uint8_t*)(base + (x)) = (y)
 #define PPC_STORE_U16(x, y) *(volatile uint16_t*)(base + (x)) = __builtin_bswap16(y)
 #define PPC_STORE_U32(x, y) *(volatile uint32_t*)(base + (x)) = __builtin_bswap32(y)
 #define PPC_STORE_U64(x, y) *(volatile uint64_t*)(base + (x)) = __builtin_bswap64(y)
+
+// MMIO Store handling is completely reliant on being preeceded by eieio.
+// TODO: Verify if that's always the case.
+#define PPC_MM_STORE_U8(x, y)   PPC_STORE_U8 (x, y)
+#define PPC_MM_STORE_U16(x, y)  PPC_STORE_U16(x, y)
+#define PPC_MM_STORE_U32(x, y)  PPC_STORE_U32(x, y)
+#define PPC_MM_STORE_U64(x, y)  PPC_STORE_U64(x, y)
 
 #define PPC_CALL_FUNC(x) x(ctx, base)
 #define PPC_CALL_INDIRECT_FUNC(x) (*(PPCFunc**)(ctx.fn + uint64_t(x) * 2))(ctx, base)
