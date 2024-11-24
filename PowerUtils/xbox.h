@@ -354,6 +354,18 @@ typedef struct _XUSER_SIGNIN_INFO {
     CHAR Name[16];
 } XUSER_SIGNIN_INFO;
 
+typedef struct _XTIME_FIELDS
+{
+    XWORD Year;
+    XWORD Month;
+    XWORD Day;
+    XWORD Hour;
+    XWORD Minute;
+    XWORD Second;
+    XWORD Milliseconds;
+    XWORD Weekday;
+} XTIME_FIELDS, * PXTIME_FIELDS;
+
 // Content types
 #define XCONTENTTYPE_SAVEDATA 1
 #define XCONTENTTYPE_DLC      2
