@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include "xdbf.h"
 
 struct Achievement
