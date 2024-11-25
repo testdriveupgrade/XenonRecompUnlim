@@ -54,6 +54,14 @@ typedef struct _XEX_FILE_FORMAT_INFO
     be<uint16_t> CompressionType;
 } XEX_FILE_FORMAT_INFO;
 
+typedef struct _XEX_RESOURCE_INFO
+{
+    be<uint32_t> SizeOfHeader;
+    uint8_t ResourceID[8];
+    be<uint32_t> Offset;
+    be<uint32_t> SizeOfData;
+} XEX_RESOURCE_INFO;
+
 typedef struct _XEX_BASIC_FILE_COMPRESSION_INFO
 {
     be<uint32_t> SizeOfData;
