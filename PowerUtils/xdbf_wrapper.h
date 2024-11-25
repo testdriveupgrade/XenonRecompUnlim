@@ -43,5 +43,3 @@ public:
     std::vector<Achievement> GetAchievements(EXDBFLanguage language) const;
     Achievement GetAchievement(EXDBFLanguage language, uint16_t id) const;
 };
-
-extern XDBFWrapper g_xdbf;
