@@ -29,7 +29,7 @@ enum EXDBFNamespace : uint16_t
     XDBF_GPD_NAMESPACE_AVATAR_AWARD_360 = 6
 };
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct XDBFEntry
 {
     be<EXDBFNamespace> NamespaceID;
@@ -37,7 +37,7 @@ struct XDBFEntry
     be<uint32_t> Offset;
     be<uint32_t> Length;
 };
-#pragma pack()
+#pragma pack(pop)
 
 struct XDBFFreeSpaceEntry
 {
@@ -71,7 +71,7 @@ struct XSTCHeader
     be<EXDBFLanguage> Language;
 };
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct XSTRHeader
 {
     be<uint32_t> Signature;
@@ -79,7 +79,7 @@ struct XSTRHeader
     be<uint32_t> Size;
     be<uint16_t> StringCount;
 };
-#pragma pack()
+#pragma pack(pop)
 
 struct XSTREntry
 {
@@ -87,7 +87,7 @@ struct XSTREntry
     be<uint16_t> Length;
 };
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct XACHHeader
 {
     be<uint32_t> Signature;
@@ -95,7 +95,7 @@ struct XACHHeader
     be<uint32_t> Size;
     be<uint16_t> AchievementCount;
 };
-#pragma pack()
+#pragma pack(pop)
 
 enum EXACHFlags : uint32_t
 {
@@ -164,7 +164,7 @@ struct XTHDHeader
     char pad0[0x10];
 };
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct XGAAHeader
 {
     be<uint32_t> Signature;
@@ -172,7 +172,7 @@ struct XGAAHeader
     be<uint32_t> Size;
     be<uint16_t> Count;
 };
-#pragma pack()
+#pragma pack(pop)
 
 struct XGAAEntry
 {
