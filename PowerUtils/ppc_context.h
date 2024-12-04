@@ -261,35 +261,7 @@ struct PPCFPSCRRegister
 
 struct PPCContext
 {
-    uint8_t* fn;
-
-#ifndef PPC_CONFIG_SKIP_LR
-    uint64_t lr;
-#endif
-#ifndef PPC_CONFIG_CTR_AS_LOCAL
-    PPCRegister ctr;
-#endif
-#ifndef PPC_CONFIG_XER_AS_LOCAL
-    PPCXERRegister xer;
-#endif
-#ifndef PPC_CONFIG_RESERVED_AS_LOCAL
-    PPCRegister reserved;
-#endif
-#ifndef PPC_CONFIG_SKIP_MSR
-    uint32_t msr = 0x200A000;
-#endif
-
-#ifndef PPC_CONFIG_CR_AS_LOCAL
-    PPCCRRegister cr0;
-    PPCCRRegister cr1;
-    PPCCRRegister cr2;
-    PPCCRRegister cr3;
-    PPCCRRegister cr4;
-    PPCCRRegister cr5;
-    PPCCRRegister cr6;
-    PPCCRRegister cr7;
-#endif
-
+    PPCRegister r3;
 #ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCRegister r0;
 #endif
@@ -297,7 +269,6 @@ struct PPCContext
 #ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
     PPCRegister r2;
 #endif
-    PPCRegister r3;
     PPCRegister r4;
     PPCRegister r5;
     PPCRegister r6;
@@ -331,6 +302,32 @@ struct PPCContext
     PPCRegister r31;
 #endif
 
+    uint8_t* fn;
+#ifndef PPC_CONFIG_SKIP_LR
+    uint64_t lr;
+#endif
+#ifndef PPC_CONFIG_CTR_AS_LOCAL
+    PPCRegister ctr;
+#endif
+#ifndef PPC_CONFIG_XER_AS_LOCAL
+    PPCXERRegister xer;
+#endif
+#ifndef PPC_CONFIG_RESERVED_AS_LOCAL
+    PPCRegister reserved;
+#endif
+#ifndef PPC_CONFIG_SKIP_MSR
+    uint32_t msr = 0x200A000;
+#endif
+#ifndef PPC_CONFIG_CR_AS_LOCAL
+    PPCCRRegister cr0;
+    PPCCRRegister cr1;
+    PPCCRRegister cr2;
+    PPCCRRegister cr3;
+    PPCCRRegister cr4;
+    PPCCRRegister cr5;
+    PPCCRRegister cr6;
+    PPCCRRegister cr7;
+#endif
     PPCFPSCRRegister fpscr;
 
 #ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
