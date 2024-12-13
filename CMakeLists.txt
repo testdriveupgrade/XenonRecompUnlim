@@ -1,6 +1,9 @@
 cmake_minimum_required (VERSION 3.20)
+
+include($ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake)
 set(THIRDPARTY_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
-set(CMAKE_CXX_STANDARD 23)
+
+set(CMAKE_CXX_STANDARD 17)
 set(BUILD_SHARED_LIBS OFF)
 
 # Enable Hot Reload for MSVC compilers if supported.
@@ -12,20 +15,6 @@ endif()
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 include("cmake/bin2h.cmake")
-include(FetchContent)
-FetchContent_Declare(
-    tomlplusplus
-    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
-    GIT_TAG        v3.4.0
-)
-FetchContent_Declare(
-    xxHash
-    GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
-    GIT_TAG        v0.8.2
-    SOURCE_SUBDIR "cmake_unofficial"
-)
-FetchContent_MakeAvailable(tomlplusplus)
-FetchContent_MakeAvailable(xxHash)
 
 add_subdirectory(${THIRDPARTY_ROOT}/disasm)
 set(POWERANALYSE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerAnalyse)

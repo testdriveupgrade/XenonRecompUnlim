@@ -4,6 +4,7 @@
 #include <bit>
 #include <algorithm>
 #include <cassert>
+#include <byteswap.h>
 
 size_t Function::SearchBlock(size_t address) const
 {
@@ -63,7 +64,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
     // TODO: Branch fallthrough
     for (; data <= dataEnd ; ++data)
     {
-        const auto addr = base + ((data - dataStart) * sizeof(*data));
+        const size_t addr = base + ((data - dataStart) * sizeof(*data));
         if (blockStack.empty())
         {
             break; // it's hideover
@@ -71,11 +72,11 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
         auto& curBlock = blocks[blockStack.back()];
         DEBUG(const auto blockBase = curBlock.base);
-        const auto instruction = std::byteswap(*data);
+        const uint32_t instruction = ByteSwap(*data);
 
-        const auto op = PPC_OP(instruction);
-        const auto xop = PPC_XOP(instruction);
-        const auto isLink = PPC_BL(instruction); // call
+        const uint32_t op = PPC_OP(instruction);
+        const uint32_t xop = PPC_XOP(instruction);
+        const uint32_t isLink = PPC_BL(instruction); // call
 
         ppc_insn insn;
         ppc::Disassemble(data, addr, insn);
@@ -103,13 +104,13 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
 
             // TODO: Handle absolute branches?
             assert(!PPC_BA(instruction));
-            const auto branchDest = addr + PPC_BD(instruction);
+            const size_t branchDest = addr + PPC_BD(instruction);
 
             // true/false paths
             // left block: false case
             // right block: true case
-            const auto lBase = (addr - base) + 4;
-            const auto rBase = (addr + PPC_BD(instruction)) - base;
+            const size_t lBase = (addr - base) + 4;
+            const size_t rBase = (addr + PPC_BD(instruction)) - base;
 
             // these will be -1 if it's our first time seeing these blocks
             auto lBlock = fn.SearchBlock(base + lBase);
@@ -124,7 +125,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                 blockStack.emplace_back(lBlock);
             }
 
-            auto rBlock = fn.SearchBlock(base + rBase);
+            size_t rBlock = fn.SearchBlock(base + rBase);
             if (rBlock == -1)
             {
                 blocks.emplace_back(branchDest - base, 0);
@@ -145,10 +146,10 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                 if (op == PPC_OP_B)
                 {
                     assert(!PPC_BA(instruction));
-                    const auto branchDest = addr + PPC_BI(instruction);
+                    const size_t branchDest = addr + PPC_BI(instruction);
 
-                    const auto branchBase = branchDest - base;
-                    const auto branchBlock = fn.SearchBlock(branchDest);
+                    const size_t branchBase = branchDest - base;
+                    const size_t branchBlock = fn.SearchBlock(branchDest);
 
                     if (branchDest < base)
                     {
@@ -158,8 +159,8 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                     }
 
                     // carry over our projection if blocks are next to each other
-                    const auto isContinuous = branchBase == curBlock.base + curBlock.size;
-                    auto sizeProjection = (size_t)-1;
+                    const bool isContinuous = branchBase == curBlock.base + curBlock.size;
+                    size_t sizeProjection = (size_t)-1;
 
                     if (curBlock.projectedSize != -1 && isContinuous)
                     {
@@ -180,12 +181,12 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
                 else if (op == PPC_OP_CTR)
                 {
                     // 5th bit of BO tells cpu to ignore the counter, which is a blr/bctr otherwise it's conditional
-                    const auto conditional = !(PPC_BO(instruction) & 0x10);
+                    const bool conditional = !(PPC_BO(instruction) & 0x10);
                     if (conditional)
                     {
                         // right block's just going to return
-                        const auto lBase = (addr - base) + 4;
-                        auto lBlock = fn.SearchBlock(lBase);
+                        const size_t lBase = (addr - base) + 4;
+                        size_t lBlock = fn.SearchBlock(lBase);
                         if (lBlock == -1)
                         {
                             blocks.emplace_back(lBase, 0);
@@ -212,7 +213,7 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
     // Sort and invalidate discontinuous blocks
     if (blocks.size() > 1)
     {
-        std::ranges::sort(blocks, [](const Block& a, const Block& b)
+        std::sort(blocks.begin(), blocks.end(), [](const Block& a, const Block& b)
         {
             return a.base < b.base;
         });

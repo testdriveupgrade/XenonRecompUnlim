@@ -13,9 +13,18 @@ enum SymbolType
 struct Symbol
 {
     mutable std::string name{};
-    uint32_t address{};
-    uint32_t size{};
+    size_t address{};
+    size_t size{};
     mutable SymbolType type{};
+
+    Symbol()
+    {
+    }
+
+    Symbol(std::string name, size_t address, size_t size, SymbolType type)
+        : name(std::move(name)), address(address), size(size), type(type)
+    {
+    }
 };
 
 struct SymbolComparer

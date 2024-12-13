@@ -13,8 +13,8 @@ void Recompiler::LoadConfig(const std::string_view& configFilePath)
 {
     config.Load(configFilePath);
 
-    const auto file = LoadFile((config.directoryPath + config.filePath).c_str()).value();
-    image = Image::ParseImage(file.data(), file.size()).value();
+    const auto file = LoadFile((config.directoryPath + config.filePath).c_str());
+    image = Image::ParseImage(file.data(), file.size());
 }
 
 void Recompiler::Analyse()
@@ -26,32 +26,32 @@ void Recompiler::Analyse()
             auto& restgpr = functions.emplace_back();
             restgpr.base = config.restGpr14Address + (i - 14) * 4;
             restgpr.size = (32 - i) * 4 + 12;
-            image.symbols.emplace(std::format("__restgprlr_{}", i), restgpr.base, restgpr.size, Symbol_Function);
+            image.symbols.emplace(Symbol{ fmt::format("__restgprlr_{}", i), restgpr.base, restgpr.size, Symbol_Function });
 
             auto& savegpr = functions.emplace_back();
             savegpr.base = config.saveGpr14Address + (i - 14) * 4;
             savegpr.size = (32 - i) * 4 + 8;
-            image.symbols.emplace(std::format("__savegprlr_{}", i), savegpr.base, savegpr.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__savegprlr_{}", i), savegpr.base, savegpr.size, Symbol_Function);
 
             auto& restfpr = functions.emplace_back();
             restfpr.base = config.restFpr14Address + (i - 14) * 4;
             restfpr.size = (32 - i) * 4 + 4;
-            image.symbols.emplace(std::format("__restfpr_{}", i), restfpr.base, restfpr.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__restfpr_{}", i), restfpr.base, restfpr.size, Symbol_Function);
 
             auto& savefpr = functions.emplace_back();
             savefpr.base = config.saveFpr14Address + (i - 14) * 4;
             savefpr.size = (32 - i) * 4 + 4;
-            image.symbols.emplace(std::format("__savefpr_{}", i), savefpr.base, savefpr.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__savefpr_{}", i), savefpr.base, savefpr.size, Symbol_Function);
 
             auto& restvmx = functions.emplace_back();
             restvmx.base = config.restVmx14Address + (i - 14) * 8;
             restvmx.size = (32 - i) * 8 + 4;
-            image.symbols.emplace(std::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
 
             auto& savevmx = functions.emplace_back();
             savevmx.base = config.saveVmx14Address + (i - 14) * 8;
             savevmx.size = (32 - i) * 8 + 4;
-            image.symbols.emplace(std::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
         }
 
         if (i >= 64)
@@ -59,19 +59,19 @@ void Recompiler::Analyse()
             auto& restvmx = functions.emplace_back();
             restvmx.base = config.restVmx64Address + (i - 64) * 8;
             restvmx.size = (128 - i) * 8 + 4;
-            image.symbols.emplace(std::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__restvmx_{}", i), restvmx.base, restvmx.size, Symbol_Function);
 
             auto& savevmx = functions.emplace_back();
             savevmx.base = config.saveVmx64Address + (i - 64) * 8;
             savevmx.size = (128 - i) * 8 + 4;
-            image.symbols.emplace(std::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("__savevmx_{}", i), savevmx.base, savevmx.size, Symbol_Function);
         }
     }
 
     for (auto& [address, size] : config.functions)
     {
         functions.emplace_back(address, size);
-        image.symbols.emplace(std::format("sub_{:X}", address), address, size, Symbol_Function);
+        image.symbols.emplace(fmt::format("sub_{:X}", address), address, size, Symbol_Function);
     }
 
     auto& pdata = *image.Find(".pdata");
@@ -80,8 +80,8 @@ void Recompiler::Analyse()
     for (size_t i = 0; i < count; i++)
     {
         auto fn = pf[i];
-        fn.BeginAddress = std::byteswap(fn.BeginAddress);
-        fn.Data = std::byteswap(fn.Data);
+        fn.BeginAddress = ByteSwap(fn.BeginAddress);
+        fn.Data = ByteSwap(fn.Data);
 
         if (image.symbols.find(fn.BeginAddress) == image.symbols.end())
         {
@@ -89,7 +89,7 @@ void Recompiler::Analyse()
             f.base = fn.BeginAddress;
             f.size = fn.FunctionLength * 4;
 
-            image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
         }
     }
 
@@ -105,7 +105,7 @@ void Recompiler::Analyse()
 
         while (data < dataEnd)
         {
-            uint32_t insn = std::byteswap(*(uint32_t*)data);
+            uint32_t insn = ByteSwap(*(uint32_t*)data);
             if (PPC_OP(insn) == PPC_OP_B && PPC_BL(insn))
             {
                 size_t address = base + (data - section.data) + PPC_BI(insn);
@@ -114,7 +114,7 @@ void Recompiler::Analyse()
                 {
                     auto data = section.data + address - section.base;
                     auto& fn = functions.emplace_back(Function::Analyze(data, section.base + section.size - address, address));
-                    image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+                    image.symbols.emplace(fmt::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
                 }
             }
             data += 4;
@@ -124,7 +124,7 @@ void Recompiler::Analyse()
 
         while (data < dataEnd)
         {
-            auto invalidInstr = config.invalidInstructions.find(std::byteswap(*(uint32_t*)data));
+            auto invalidInstr = config.invalidInstructions.find(ByteSwap(*(uint32_t*)data));
             if (invalidInstr != config.invalidInstructions.end())
             {
                 base += invalidInstr->second;
@@ -143,7 +143,7 @@ void Recompiler::Analyse()
             else
             {
                 auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
-                image.symbols.emplace(std::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+                image.symbols.emplace(fmt::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
 
                 base += fn.size;
                 data += fn.size;
@@ -172,9 +172,9 @@ bool Recompiler::Recompile(
                 (config.nonVolatileRegistersAsLocalVariables && index >= 14))
             {
                 localVariables.r[index] = true;
-                return std::format("r{}", index);
+                return fmt::format("r{}", index);
             }
-            return std::format("ctx.r{}", index);
+            return fmt::format("ctx.r{}", index);
         };
 
     auto f = [&](size_t index)
@@ -183,9 +183,9 @@ bool Recompiler::Recompile(
                 (config.nonVolatileRegistersAsLocalVariables && index >= 14))
             {
                 localVariables.f[index] = true;
-                return std::format("f{}", index);
+                return fmt::format("f{}", index);
             }
-            return std::format("ctx.f{}", index);
+            return fmt::format("ctx.f{}", index);
         };
 
     auto v = [&](size_t index)
@@ -194,9 +194,9 @@ bool Recompiler::Recompile(
                 (config.nonVolatileRegistersAsLocalVariables && ((index >= 14 && index <= 31) || (index >= 64 && index <= 127))))
             {
                 localVariables.v[index] = true;
-                return std::format("v{}", index);
+                return fmt::format("v{}", index);
             }
-            return std::format("ctx.v{}", index);
+            return fmt::format("ctx.v{}", index);
         };
 
     auto cr = [&](size_t index)
@@ -204,9 +204,9 @@ bool Recompiler::Recompile(
             if (config.crRegistersAsLocalVariables)
             {
                 localVariables.cr[index] = true;
-                return std::format("cr{}", index);
+                return fmt::format("cr{}", index);
             }
-            return std::format("ctx.cr{}", index);
+            return fmt::format("ctx.cr{}", index);
         };
 
     auto ctr = [&]()
@@ -287,7 +287,7 @@ bool Recompiler::Recompile(
 
                 if (targetSymbol != image.symbols.end() && targetSymbol->address == address && targetSymbol->type == Symbol_Function)
                 {
-                    if (config.nonVolatileRegistersAsLocalVariables && (targetSymbol->name.starts_with("__rest") || targetSymbol->name.starts_with("__save")))
+                    if (config.nonVolatileRegistersAsLocalVariables && (targetSymbol->name.find("__rest") == 0 || targetSymbol->name.find("__save") == 0))
                     {
                         // print nothing
                     }
@@ -513,7 +513,7 @@ bool Recompiler::Recompile(
                 if (label < fn.base || label >= fn.base + fn.size)
                 {
                     println("\t\t// ERROR: 0x{:X}", label);
-                    std::println("ERROR: Switch case at {:X} is trying to jump outside function: {:X}", base, label);
+                    fmt::println("ERROR: Switch case at {:X} is trying to jump outside function: {:X}", base, label);
                     println("\t\treturn;");
                 }
                 else
@@ -1897,7 +1897,7 @@ bool Recompiler::Recompile(
         {
         case 0: // D3D color
             if (insn.operands[3] != 1 || insn.operands[4] != 3)
-                std::println("Unexpected D3D color pack instruction at {:X}", base);
+                fmt::println("Unexpected D3D color pack instruction at {:X}", base);
 
             for (size_t i = 0; i < 4; i++)
             {
@@ -2145,7 +2145,7 @@ bool Recompiler::Recompile(
     {
         int lastLine = out.find_last_of('\n', out.size() - 2);
         if (out.find("cr0", lastLine + 1) == std::string::npos && out.find("cr6", lastLine + 1) == std::string::npos)
-            std::println("{} at {:X} has RC bit enabled but no comparison was generated", insn.opcode->name, base);
+            fmt::println("{} at {:X} has RC bit enabled but no comparison was generated", insn.opcode->name, base);
     }
 #endif
     
@@ -2163,7 +2163,7 @@ bool Recompiler::Recompile(const Function& fn)
 
     for (size_t addr = base; addr < end; addr += 4)
     {
-        const uint32_t instruction = std::byteswap(*(uint32_t*)((char*)data + addr - base));
+        const uint32_t instruction = ByteSwap(*(uint32_t*)((char*)data + addr - base));
         if (!PPC_BL(instruction))
         {
             const size_t op = PPC_OP(instruction);
@@ -2248,7 +2248,7 @@ bool Recompiler::Recompile(const Function& fn)
     }
     else
     {
-        name = std::format("sub_{}", fn.base);
+        name = fmt::format("sub_{}", fn.base);
     }
 
     println("__attribute__((alias(\"__imp__{}\"))) PPC_WEAK_FUNC({});", name, name);
@@ -2268,7 +2268,7 @@ bool Recompiler::Recompile(const Function& fn)
     ppc_insn insn;
     while (base < end)
     {
-        if (labels.contains(base))
+        if (labels.find(base) != labels.end())
         {
             println("loc_{:X}:", base);
 
@@ -2286,17 +2286,17 @@ bool Recompiler::Recompile(const Function& fn)
             println("\t// {}", insn.op_str);
 #if 1
             if (*data != 0)
-                std::println("Unable to decode instruction {:X} at {:X}", *data, base);
+                fmt::println("Unable to decode instruction {:X} at {:X}", *data, base);
 #endif
         }
         else
         {
             if (insn.opcode->id == PPC_INST_BCTR && (*(data - 1) == 0x07008038 || *(data - 1) == 0x00000060) && switchTable == config.switchTables.end())
-                std::println("Found a switch jump table at {:X} with no switch table entry present", base);
+                fmt::println("Found a switch jump table at {:X} with no switch table entry present", base);
 
             if (!Recompile(fn, base, insn, data, switchTable, localVariables, csrState))
             {
-                std::println("Unrecognized instruction at 0x{:X}: {}", base, insn.opcode->name);
+                fmt::println("Unrecognized instruction at 0x{:X}: {}", base, insn.opcode->name);
                 allRecompiled = false;
             }
         }
@@ -2307,7 +2307,7 @@ bool Recompiler::Recompile(const Function& fn)
 
 #if 0
     if (insn.opcode == nullptr || (insn.opcode->id != PPC_INST_B && insn.opcode->id != PPC_INST_BCTR && insn.opcode->id != PPC_INST_BLR))
-        std::println("Function at {:X} ends prematurely with instruction {} at {:X}", fn.base, insn.opcode != nullptr ? insn.opcode->name : "INVALID", base - 4);
+        fmt::println("Function at {:X} ends prematurely with instruction {} at {:X}", fn.base, insn.opcode != nullptr ? insn.opcode->name : "INVALID", base - 4);
 #endif
 
     println("}}\n");
@@ -2441,7 +2441,7 @@ void Recompiler::Recompile()
         }
 
         if ((i % 2048) == 0 || (i == (functions.size() - 1)))
-            std::println("Recompiling functions... {}%", static_cast<float>(i + 1) / functions.size() * 100.0f);
+            fmt::println("Recompiling functions... {}%", static_cast<float>(i + 1) / functions.size() * 100.0f);
 
         Recompile(functions[i]);
     }
@@ -2457,14 +2457,14 @@ void Recompiler::SaveCurrentOutData(const std::string_view& name)
 
         if (name.empty())
         {
-            cppName = std::format("ppc_recomp.{}.cpp", cppFileIndex);
+            cppName = fmt::format("ppc_recomp.{}.cpp", cppFileIndex);
             ++cppFileIndex;
         }
 
         bool shouldWrite = true;
 
         // Check if an identical file already exists first to not trigger recompilation
-        std::string filePath = std::format("{}/{}/{}", config.directoryPath, config.outDirectoryPath, name.empty() ? cppName : name);
+        std::string filePath = fmt::format("{}/{}/{}", config.directoryPath, config.outDirectoryPath, name.empty() ? cppName : name);
         FILE* f = fopen(filePath.c_str(), "rb");
         if (f)
         {

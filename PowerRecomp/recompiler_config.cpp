@@ -100,14 +100,14 @@ void RecompilerConfig::Load(const std::string_view& configFilePath)
                 (midAsmHook.returnOnTrue && midAsmHook.jumpAddressOnTrue != NULL) ||
                 (midAsmHook.returnOnFalse && midAsmHook.jumpAddressOnFalse != NULL))
             {
-                std::println("{}: can't return and jump at the same time", midAsmHook.name);
+                fmt::println("{}: can't return and jump at the same time", midAsmHook.name);
             }
 
             if ((midAsmHook.ret || midAsmHook.jumpAddress != NULL) &&
                 (midAsmHook.returnOnFalse != NULL || midAsmHook.returnOnTrue != NULL ||
                     midAsmHook.jumpAddressOnFalse != NULL || midAsmHook.jumpAddressOnTrue != NULL))
             {
-                std::println("{}: can't mix direct and conditional return/jump", midAsmHook.name);
+                fmt::println("{}: can't mix direct and conditional return/jump", midAsmHook.name);
             }
 
             midAsmHooks.emplace(*table["address"].value<uint32_t>(), std::move(midAsmHook));

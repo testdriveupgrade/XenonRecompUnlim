@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <bit>
 #include <string>
-
+#include "byteswap.h"
 
 #ifdef _WIN32
     #include <windows.h>
@@ -81,22 +81,22 @@ struct be
     {
         if constexpr (std::is_same_v<T, double>)
         {
-            const uint64_t swapped = std::byteswap(*reinterpret_cast<uint64_t*>(&value));
+            const uint64_t swapped = ByteSwap(*reinterpret_cast<uint64_t*>(&value));
             return *reinterpret_cast<const T*>(&swapped);
         }
         else if constexpr (std::is_same_v<T, float>)
         {
-            const uint32_t swapped = std::byteswap(*reinterpret_cast<uint32_t*>(&value));
+            const uint32_t swapped = ByteSwap(*reinterpret_cast<uint32_t*>(&value));
             return *reinterpret_cast<const T*>(&swapped);
         }
         else if constexpr (std::is_enum_v<T>)
         {
-            const std::underlying_type_t<T> swapped = std::byteswap(*reinterpret_cast<std::underlying_type_t<T>*>(&value));
+            const std::underlying_type_t<T> swapped = ByteSwap(*reinterpret_cast<std::underlying_type_t<T>*>(&value));
             return *reinterpret_cast<const T*>(&swapped);
         }
         else
         {
-            return std::byteswap(value);
+            return ByteSwap(value);
         }
     }
 

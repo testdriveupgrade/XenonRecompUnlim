@@ -22,7 +22,7 @@ void TestRecompiler::Analyse(const std::string_view& testName)
             }
 
             auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
-            image.symbols.emplace(std::format("{}_{:X}", testName, fn.base), fn.base, fn.size, Symbol_Function);
+            image.symbols.emplace(fmt::format("{}_{:X}", testName, fn.base), fn.base, fn.size, Symbol_Function);
             
             base += fn.size;
             data += fn.size;
@@ -40,11 +40,11 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
     {
         if (file.path().extension() == ".o")
         {
-            const auto exeFile = LoadFile(file.path().string().c_str()).value();
+            const auto exeFile = LoadFile(file.path().string().c_str());
 
             TestRecompiler recompiler;
             recompiler.config.outDirectoryPath = dstDirectoryPath;
-            recompiler.image = Image::ParseImage(exeFile.data(), exeFile.size()).value();
+            recompiler.image = Image::ParseImage(exeFile.data(), exeFile.size());
 
             auto stem = file.path().stem().string();
             recompiler.Analyse(stem);
@@ -61,7 +61,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                 }
                 else
                 {
-                    std::println("Function {:X} in {} has unimplemented instructions", fn.base, stem);
+                    fmt::println("Function {:X} in {} has unimplemented instructions", fn.base, stem);
                 }
             }
             stem += ".cpp";
@@ -73,7 +73,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
 
     for (auto& [fn, addr] : functions)
     {
-        std::ifstream in(std::format("{}/{}.dis", srcDirectoryPath, fn));
+        std::ifstream in(fmt::format("{}/{}.dis", srcDirectoryPath, fn));
         if (in.is_open())
         {
             std::string line;
@@ -86,30 +86,30 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                     size_t address = ~0;
                     std::from_chars(&line[0], &line[spaceIndex], address, 16);
                     address &= 0xFFFFF;
-                    if (addr.contains(address))
-                        symbols.emplace(line.substr(spaceIndex + 2, bracketIndex - spaceIndex - 2), std::format("{}_{:X}", fn, address));
+                    if (addr.find(address) != addr.end())
+                        symbols.emplace(line.substr(spaceIndex + 2, bracketIndex - spaceIndex - 2), fmt::format("{}_{:X}", fn, address));
                 }
             }
         }
         else
         {
-            std::println("Unable to locate disassembly file for {}", fn);
+            fmt::println("Unable to locate disassembly file for {}", fn);
         }
     }
 
-    FILE* file = fopen(std::format("{}/main.cpp", dstDirectoryPath).c_str(), "w");
+    FILE* file = fopen(fmt::format("{}/main.cpp", dstDirectoryPath).c_str(), "w");
     std::string main;
 
-    std::println(file, "#define PPC_CONFIG_H_INCLUDED");
-    std::println(file, "#include <ppc_context.h>");
-    std::println(file, "#include <Windows.h>");
-    std::println(file, "#include <print>\n");
-    std::println(file, "#define PPC_CHECK_VALUE_U(f, lhs, rhs) if (lhs != rhs) std::println(#f \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{:X}}\", lhs)\n");
-    std::println(file, "#define PPC_CHECK_VALUE_F(f, lhs, rhs) if (lhs != rhs) std::println(#f \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{}}\", lhs)\n");
+    fmt::println(file, "#define PPC_CONFIG_H_INCLUDED");
+    fmt::println(file, "#include <ppc_context.h>");
+    fmt::println(file, "#include <Windows.h>");
+    fmt::println(file, "#include <print>\n");
+    fmt::println(file, "#define PPC_CHECK_VALUE_U(f, lhs, rhs) if (lhs != rhs) fmt::println(#f \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{:X}}\", lhs)\n");
+    fmt::println(file, "#define PPC_CHECK_VALUE_F(f, lhs, rhs) if (lhs != rhs) fmt::println(#f \" \" #lhs \" EXPECTED \" #rhs \" ACTUAL {{}}\", lhs)\n");
 
     for (auto& [fn, addr] : functions)
     {
-        std::ifstream in(std::format("{}/../{}.s", srcDirectoryPath, fn));
+        std::ifstream in(fmt::format("{}/../{}.s", srcDirectoryPath, fn));
         if (in.is_open())
         {
             std::string str;
@@ -135,10 +135,10 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                         auto symbol = symbols.find(name);
                         if (symbol != symbols.end())
                         {
-                            std::println(file, "PPC_FUNC({});\n", symbol->second);
-                            std::println(file, "void {}(uint8_t* base) {{", name);
-                            std::println(file, "\tPPCContext ctx{{}};");
-                            std::println(file, "\tctx.fpscr.loadFromHost();");
+                            fmt::println(file, "PPC_FUNC({});\n", symbol->second);
+                            fmt::println(file, "void {}(uint8_t* base) {{", name);
+                            fmt::println(file, "\tPPCContext ctx{{}};");
+                            fmt::println(file, "\tctx.fpscr.loadFromHost();");
 
                             while (getline() && !str.empty() && str[0] == '#')
                             {
@@ -158,14 +158,14 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                             int commaIndex2 = str.find(',', commaIndex1 + 1);
                                             int closingBracketIndex = str.find(']', commaIndex2 + 1);
 
-                                            std::println(file, "\tctx.{}.u32[3] = 0x{};", reg, str.substr(openingBracketIndex + 1, commaIndex0 - openingBracketIndex - 1));
-                                            std::println(file, "\tctx.{}.u32[2] = 0x{};", reg, str.substr(commaIndex0 + 2, commaIndex1 - commaIndex0 - 2));
-                                            std::println(file, "\tctx.{}.u32[1] = 0x{};", reg, str.substr(commaIndex1 + 2, commaIndex2 - commaIndex1 - 2));
-                                            std::println(file, "\tctx.{}.u32[0] = 0x{};", reg, str.substr(commaIndex2 + 2, closingBracketIndex - commaIndex2 - 2));
+                                            fmt::println(file, "\tctx.{}.u32[3] = 0x{};", reg, str.substr(openingBracketIndex + 1, commaIndex0 - openingBracketIndex - 1));
+                                            fmt::println(file, "\tctx.{}.u32[2] = 0x{};", reg, str.substr(commaIndex0 + 2, commaIndex1 - commaIndex0 - 2));
+                                            fmt::println(file, "\tctx.{}.u32[1] = 0x{};", reg, str.substr(commaIndex1 + 2, commaIndex2 - commaIndex1 - 2));
+                                            fmt::println(file, "\tctx.{}.u32[0] = 0x{};", reg, str.substr(commaIndex2 + 2, closingBracketIndex - commaIndex2 - 2));
                                         }
                                         else
                                         {
-                                            std::println(file, "\tctx.{}.{}64 = {};",
+                                            fmt::println(file, "\tctx.{}.{}64 = {};",
                                                 reg,
                                                 str.find('.', secondSpaceIndex) != std::string::npos ? 'f' : 'u',
                                                 str.substr(secondSpaceIndex + 1));
@@ -183,7 +183,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                             {
                                                 if (str[i] != ' ')
                                                 {
-                                                    std::println(file, "\tbase[0x{} + 0x{:X}] = 0x{}{};", address, j, str[i], str[i + 1]);
+                                                    fmt::println(file, "\tbase[0x{} + 0x{:X}] = 0x{}{};", address, j, str[i], str[i + 1]);
                                                     ++i; // the loop adds another
                                                     ++j;
                                                 }
@@ -196,7 +196,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                             while (getline() && (str.empty() || str[0] != '#'))
                                 ;
 
-                            std::println(file, "\t{}(ctx, base);", symbol->second);
+                            fmt::println(file, "\t{}(ctx, base);", symbol->second);
 
                             do
                             {
@@ -218,14 +218,14 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                             int commaIndex2 = str.find(',', commaIndex1 + 1);
                                             int closingBracketIndex = str.find(']', commaIndex2 + 1);
 
-                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[3], 0x{});", name, reg, str.substr(openingBracketIndex + 1, commaIndex0 - openingBracketIndex - 1));
-                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[2], 0x{});", name, reg, str.substr(commaIndex0 + 2, commaIndex1 - commaIndex0 - 2));
-                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[1], 0x{});", name, reg, str.substr(commaIndex1 + 2, commaIndex2 - commaIndex1 - 2));
-                                            std::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[0], 0x{});", name, reg, str.substr(commaIndex2 + 2, closingBracketIndex - commaIndex2 - 2));
+                                            fmt::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[3], 0x{});", name, reg, str.substr(openingBracketIndex + 1, commaIndex0 - openingBracketIndex - 1));
+                                            fmt::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[2], 0x{});", name, reg, str.substr(commaIndex0 + 2, commaIndex1 - commaIndex0 - 2));
+                                            fmt::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[1], 0x{});", name, reg, str.substr(commaIndex1 + 2, commaIndex2 - commaIndex1 - 2));
+                                            fmt::println(file, "\tPPC_CHECK_VALUE_U({}, ctx.{}.u32[0], 0x{});", name, reg, str.substr(commaIndex2 + 2, closingBracketIndex - commaIndex2 - 2));
                                         }
                                         else
                                         {
-                                            std::println(file, "\tPPC_CHECK_VALUE_{}({}, ctx.{}.{}64, {});",
+                                            fmt::println(file, "\tPPC_CHECK_VALUE_{}({}, ctx.{}.{}64, {});",
                                                 str.find('.', secondSpaceIndex) != std::string::npos ? 'F' : 'U',
                                                 name,
                                                 reg,
@@ -245,7 +245,7 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                             {
                                                 if (str[i] != ' ')
                                                 {
-                                                    std::println(file, "\tPPC_CHECK_VALUE_U({}, base[0x{} + 0x{:X}], 0x{}{});", name, address, j, str[i], str[i + 1]);
+                                                    fmt::println(file, "\tPPC_CHECK_VALUE_U({}, base[0x{} + 0x{:X}], 0x{}{});", name, address, j, str[i], str[i + 1]);
                                                     ++i; // the loop adds another
                                                     ++j;
                                                 }
@@ -255,13 +255,13 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
                                 }
                             } while (getline() && !str.empty() && str[0] == '#');
 
-                            std::println(file, "}}\n");
+                            fmt::println(file, "}}\n");
 
-                            std::format_to(std::back_inserter(main), "\t{}(base);\n", name);
+                            fmt::format_to(std::back_inserter(main), "\t{}(base);\n", name);
                         }
                         else
                         {
-                            std::println("Found no symbol for {}", name);
+                            fmt::println("Found no symbol for {}", name);
                         }
                     }
                 }
@@ -269,15 +269,15 @@ void TestRecompiler::RecompileTests(const char* srcDirectoryPath, const char* ds
         }
         else
         {
-            std::println("Unable to locate source file for {}", fn);
+            fmt::println("Unable to locate source file for {}", fn);
         }
     }
 
-    std::println(file, "int main() {{");
-    std::println(file, "\tuint8_t* base = reinterpret_cast<uint8_t*>(VirtualAlloc(nullptr, 0x100000000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));");
+    fmt::println(file, "int main() {{");
+    fmt::println(file, "\tuint8_t* base = reinterpret_cast<uint8_t*>(VirtualAlloc(nullptr, 0x100000000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));");
     fwrite(main.data(), 1, main.size(), file);
-    std::println(file, "\treturn 0;");
-    std::println(file, "}}");
+    fmt::println(file, "\treturn 0;");
+    fmt::println(file, "}}");
 
     fclose(file);
 }

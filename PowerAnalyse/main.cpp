@@ -1,10 +1,11 @@
 #include <cassert>
+#include <iterator>
 #include <file.h>
 #include <disasm.h>
 #include <image.h>
-#include "function.h"
-#include <print>
 #include <xbox.h>
+#include <fmt/core.h>
+#include "function.h"
 
 #define SWITCH_ABSOLUTE 0
 #define SWITCH_COMPUTED 1
@@ -139,7 +140,7 @@ void MakeMask(const uint32_t* instructions, size_t count)
     for (size_t i = 0; i < count; i++)
     {
         ppc::Disassemble(&instructions[i], 0, insn);
-        std::println("0x{:X}, // {}", std::byteswap(insn.opcode->opcode | (insn.instruction & insn.opcode->mask)), insn.opcode->name);
+        fmt::println("0x{:X}, // {}", ByteSwap(insn.opcode->opcode | (insn.instruction & insn.opcode->mask)), insn.opcode->name);
     }
 }
 
@@ -173,13 +174,13 @@ void* SearchMask(const void* source, const uint32_t* compare, size_t compareCoun
 
 int main()
 {
-    const auto file = LoadFile("private/default.xex").value();
-    auto image = Image::ParseImage(file.data(), file.size()).value();
+    const auto file = LoadFile("private/default.xex");
+    auto image = Image::ParseImage(file.data(), file.size());
 
     std::string out;
-    auto println = [&]<class... Args>(std::format_string<Args...> fmt, Args&&... args)
+    auto println = [&]<class... Args>(fmt::format_string<Args...> fmt, Args&&... args)
     {
-        std::vformat_to(std::back_inserter(out), fmt.get(), std::make_format_args(args...));
+        fmt::vformat_to(std::back_inserter(out), fmt.get(), fmt::make_format_args(args...));
         out += '\n';
     };
     //for (const auto& section : image.sections)
@@ -190,7 +191,7 @@ int main()
     // MakeMask((uint32_t*)image.Find(0x82C40D84), 6);
 
     //auto data = "\x4D\x99\x00\x20";
-    //auto data2 = std::byteswap((2129));
+    //auto data2 = ByteSwap((2129));
     //ppc_insn insn;
     //ppc_insn insn2;
     //ppc::Disassemble(data, 0, insn);
@@ -261,7 +262,7 @@ int main()
                         table.type = type;
                         ScanTable((uint32_t*)data, base + (data - dataStart), table);
 
-                        // std::println("{:X} ; jmptable - {}", base + (data - dataStart), table.labels.size());
+                        // fmt::println("{:X} ; jmptable - {}", base + (data - dataStart), table.labels.size());
                         if (table.base != 0)
                         {
                             ReadTable(image, table);
@@ -335,15 +336,15 @@ int main()
     fwrite(out.data(), 1, out.size(), f);
     fclose(f);
 
-    uint32_t cxxFrameHandler = std::byteswap(0x831B1C90);
-    uint32_t cSpecificFrameHandler = std::byteswap(0x8324B3BC);
+    uint32_t cxxFrameHandler = ByteSwap(0x831B1C90);
+    uint32_t cSpecificFrameHandler = ByteSwap(0x8324B3BC);
     image.symbols.emplace("__CxxFrameHandler", 0x831B1C90, 0x38, Symbol_Function);
     image.symbols.emplace("__C_specific_handler", 0x8324B3BC, 0x38, Symbol_Function);
     image.symbols.emplace("memcpy", 0x831B0ED0, 0x488, Symbol_Function);
     image.symbols.emplace("memset", 0x831B0BA0, 0xA0, Symbol_Function);
     image.symbols.emplace("blkmov", 0x831B1358, 0xA8, Symbol_Function);
 
-    image.symbols.emplace(std::format("sub_{:X}", 0x82EF5D78), 0x82EF5D78, 0x3F8, Symbol_Function);
+    image.symbols.emplace(fmt::format("sub_{:X}", 0x82EF5D78), 0x82EF5D78, 0x3F8, Symbol_Function);
 
     // auto fnd = Function::Analyze(image.Find(0x82C40D58), image.size, 0x82C40D58);
 
@@ -354,8 +355,8 @@ int main()
     for (size_t i = 0; i < count; i++)
     {
         auto fn = pf[i];
-        fn.BeginAddress = std::byteswap(fn.BeginAddress);
-        fn.Data = std::byteswap(fn.Data);
+        fn.BeginAddress = ByteSwap(fn.BeginAddress);
+        fn.Data = ByteSwap(fn.Data);
 
         auto& f = functions.emplace_back();
         f.base = fn.BeginAddress;
@@ -366,7 +367,7 @@ int main()
             __debugbreak();
         }
 
-        image.symbols.emplace(std::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
+        image.symbols.emplace(fmt::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
     }
 
     auto sym = image.symbols.find(0x82BD7420);
@@ -413,7 +414,7 @@ int main()
                 base += missingFn.size;
                 data += missingFn.size;
                 
-                std::println("sub_{:X}", missingFn.base);
+                fmt::println("sub_{:X}", missingFn.base);
             }
         }
     }
@@ -421,7 +422,7 @@ int main()
     //ppc_insn insn;
     //uint8_t c[4] = { 0x10, 0x00, 0x59, 0xC3 };
     //ppc::Disassemble(c, 0x831D6C64, insn);
-    //std::println("{:20}{}", insn.opcode->name, insn.op_str);
+    //fmt::println("{:20}{}", insn.opcode->name, insn.op_str);
 
 
     const auto entrySymbol = image.symbols.find(image.entry_point);
@@ -432,21 +433,21 @@ int main()
 
     image.symbols.emplace("_start", image.entry_point, entrySize, Symbol_Function);
 
-    std::println("FUNCTIONS");
+    fmt::println("FUNCTIONS");
     for (const auto& fn : functions)
     {
-        std::println("\tsub_{:X}", fn.base);
+        fmt::println("\tsub_{:X}", fn.base);
     }
-    std::println("");
+    fmt::println("");
     
 
-    std::println("SECTIONS");
+    fmt::println("SECTIONS");
     for (const auto& section : image.sections)
     {
-        std::printf("Section %.8s\n", section.name.c_str());
-        std::printf("\t%X-%X\n", section.base, section.base + section.size);
+        printf("Section %.8s\n", section.name.c_str());
+        printf("\t%X-%X\n", section.base, section.base + section.size);
     }
 
-    std::println("");
+    fmt::println("");
     return 0;
 }

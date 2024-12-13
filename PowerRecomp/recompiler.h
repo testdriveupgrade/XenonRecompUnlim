@@ -38,15 +38,15 @@ struct Recompiler
     void LoadConfig(const std::string_view& configFilePath);
 
     template<class... Args>
-    void print(std::format_string<Args...> fmt, Args&&... args)
+    void print(fmt::format_string<Args...> fmt, Args&&... args)
     {
-        std::vformat_to(std::back_inserter(out), fmt.get(), std::make_format_args(args...));
+        fmt::vformat_to(std::back_inserter(out), fmt.get(), fmt::make_format_args(args...));
     }
 
     template<class... Args>
-    void println(std::format_string<Args...> fmt, Args&&... args)
+    void println(fmt::format_string<Args...> fmt, Args&&... args)
     {
-        std::vformat_to(std::back_inserter(out), fmt.get(), std::make_format_args(args...));
+        fmt::vformat_to(std::back_inserter(out), fmt.get(), fmt::make_format_args(args...));
         out += '\n';
     }
 

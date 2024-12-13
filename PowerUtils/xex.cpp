@@ -126,7 +126,7 @@ Image Xex2LoadImage(const uint8_t* data)
             {
                 auto originalThunk = (XEX_THUNK_DATA*)image.Find(descriptors[im].FirstThunk);
                 auto originalData = originalThunk;
-                originalData->Data = std::byteswap(originalData->Data);
+                originalData->Data = ByteSwap(originalData->Data);
 
                 if (originalData->OriginalData.Type != 0)
                 {
@@ -134,7 +134,7 @@ Image Xex2LoadImage(const uint8_t* data)
                     auto name = names->find(originalData->OriginalData.Ordinal);
                     if (name != names->end())
                     {
-                        image.symbols.emplace(name->second, descriptors[im].FirstThunk, sizeof(thunk), Symbol_Function);
+                        image.symbols.insert({ name->second, descriptors[im].FirstThunk, sizeof(thunk), Symbol_Function });
                     }
 
                     memcpy(originalThunk, thunk, sizeof(thunk));

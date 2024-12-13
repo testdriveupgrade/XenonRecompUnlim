@@ -44,7 +44,7 @@ struct Image
      * \param size Size of data
      * \return Parsed image
      */
-    static std::expected<Image, int> ParseImage(const uint8_t* data, size_t size);
+    static Image ParseImage(const uint8_t* data, size_t size);
 };
 
 Image ElfLoadImage(const uint8_t* data, size_t size);
