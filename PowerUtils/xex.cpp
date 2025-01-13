@@ -135,7 +135,7 @@ Image Xex2LoadImage(const uint8_t* data)
     // Decompress image
     if (compressionInfo != nullptr)
     {
-        assert(compressionInfo->CompressionType >= XEX_COMPRESSION_BASIC);
+        assert(compressionInfo->CompressionType <= XEX_COMPRESSION_BASIC);
         assert(compressionInfo->EncryptionType == XEX_ENCRYPTION_NONE);
 
         if (compressionInfo->CompressionType == XEX_COMPRESSION_NONE)
