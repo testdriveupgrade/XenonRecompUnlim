@@ -3,7 +3,11 @@
 void RecompilerConfig::Load(const std::string_view& configFilePath)
 {
     directoryPath = configFilePath.substr(0, configFilePath.find_last_of("\\/") + 1);
-    toml::table toml = toml::parse_file(configFilePath);
+    toml::table toml = toml::parse_file(configFilePath)
+#if !TOML_EXCEPTIONS
+        .table()
+#endif
+        ;
 
     if (auto mainPtr = toml["main"].as_table())
     {
@@ -56,7 +60,11 @@ void RecompilerConfig::Load(const std::string_view& configFilePath)
 
         if (!switchTableFilePath.empty())
         {
-            toml::table switchToml = toml::parse_file(directoryPath + switchTableFilePath);
+            toml::table switchToml = toml::parse_file(directoryPath + switchTableFilePath)
+#if !TOML_EXCEPTIONS
+                .table()
+#endif
+                ;
             if (auto switchArray = switchToml["switch"].as_array())
             {
                 for (auto& entry : *switchArray)
