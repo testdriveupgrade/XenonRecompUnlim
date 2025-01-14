@@ -13,8 +13,6 @@ endif()
 
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
-include("cmake/bin2h.cmake")
-
 add_subdirectory(${THIRDPARTY_ROOT})
 set(POWERANALYSE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerAnalyse)
 set(POWERUTILS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerUtils)

@@ -64,7 +64,7 @@ struct Recompiler
 
     bool Recompile(const Function& fn);
 
-    void Recompile();
+    void Recompile(const std::filesystem::path& headerFilePath);
 
     void SaveCurrentOutData(const std::string_view& name = std::string_view());
 };

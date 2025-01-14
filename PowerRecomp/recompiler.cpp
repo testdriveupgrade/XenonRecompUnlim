@@ -2361,7 +2361,7 @@ bool Recompiler::Recompile(const Function& fn)
     return allRecompiled;
 }
 
-void Recompiler::Recompile()
+void Recompiler::Recompile(const std::filesystem::path& headerFilePath)
 {
     out.reserve(10 * 1024 * 1024);
 
@@ -2403,7 +2403,14 @@ void Recompiler::Recompile()
         println("#pragma once");
 
         println("#include \"ppc_config.h\"\n");
-        println("{}", std::string_view{g_PPCContextText, g_PPCContextText_size});
+        
+        std::ifstream stream(headerFilePath);
+        if (stream.good())
+        {
+            std::stringstream ss;
+            ss << stream.rdbuf();
+            out += ss.str();
+        }
 
         SaveCurrentOutData("ppc_context.h");
     }

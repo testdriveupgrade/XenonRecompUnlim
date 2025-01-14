@@ -23,7 +23,15 @@ int main(int argc, char* argv[])
             entry->name = "_xstart";
         }
 
-        recompiler.Recompile();
+        const char* headerFilePath =
+#ifdef HEADER_FILE_PATH
+            HEADER_FILE_PATH
+#else
+            argv[2]
+#endif
+            ;
+
+        recompiler.Recompile(headerFilePath);
     }
     else
     {
