@@ -105,12 +105,12 @@
 #define PPC_CALL_FUNC(x) x(ctx, base)
 #endif
 
-#define PPC_MEMORY_SIZE        0x100000000ull
-#define PPC_FUNC_TABLE_OFFSET  PPC_MEMORY_SIZE
-#define PPC_FUNC_TABLE_SIZE    0x200000000ull
+#define PPC_MEMORY_SIZE 0x100000000ull
+
+#define PPC_LOOKUP_FUNC(x, y) *(PPCFunc**)(x + PPC_IMAGE_BASE + PPC_IMAGE_SIZE + (uint64_t(uint32_t(y) - PPC_CODE_BASE) * 2))
 
 #ifndef PPC_CALL_INDIRECT_FUNC
-#define PPC_CALL_INDIRECT_FUNC(x) (*(PPCFunc**)(base + PPC_FUNC_TABLE_OFFSET + (uint64_t(x) * 2)))(ctx, base)
+#define PPC_CALL_INDIRECT_FUNC(x) (PPC_LOOKUP_FUNC(base, x))(ctx, base)
 #endif
 
 typedef void PPCFunc(struct PPCContext& __restrict__ ctx, uint8_t* base);

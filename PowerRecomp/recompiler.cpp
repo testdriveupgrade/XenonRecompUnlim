@@ -2390,6 +2390,30 @@ void Recompiler::Recompile(const std::filesystem::path& headerFilePath)
 
         println("");
 
+        println("#define PPC_IMAGE_BASE 0x{:X}ull", image.base);
+        println("#define PPC_IMAGE_SIZE 0x{:X}ull", image.size);
+        
+        // Extract the address of the minimum code segment to store the function table at.
+        size_t codeMin = ~0;
+        size_t codeMax = 0;
+
+        for (auto& section : image.sections)
+        {
+            if ((section.flags & SectionFlags_Code) != 0)
+            {
+                if (section.base < codeMin)
+                    codeMin = section.base;
+
+                if ((section.base + section.size) > codeMax)
+                    codeMax = (section.base + section.size);
+            }
+        }
+
+        println("#define PPC_CODE_BASE 0x{:X}ull", codeMin);
+        println("#define PPC_CODE_SIZE 0x{:X}ull", codeMax - codeMin);
+
+        println("");
+
         println("#ifdef PPC_INCLUDE_DETAIL");
         println("#include \"ppc_detail.h\"");
         println("#endif");
