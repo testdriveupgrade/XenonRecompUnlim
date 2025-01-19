@@ -1,4 +1,4 @@
-project("PowerSample")
+project("XenonSample")
 
 add_compile_options(
     "/D_HAS_EXCEPTIONS=0"
@@ -9,6 +9,6 @@ add_compile_options(
     "-fno-strict-aliasing")
 
 file(GLOB RecompiledFiles *.cpp)
-add_library(PowerSample ${RecompiledFiles})
+add_library(XenonSample ${RecompiledFiles})
 
-target_precompile_headers(PowerSample PUBLIC "ppc_recomp_shared.h")
+target_precompile_headers(XenonSample PUBLIC "ppc_recomp_shared.h")

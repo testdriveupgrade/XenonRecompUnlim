@@ -4,8 +4,8 @@
 int main(int argc, char* argv[])
 {
     const char* path = 
-    #ifdef CONFIG_FILE_PATH
-        CONFIG_FILE_PATH
+    #ifdef XENON_RECOMP_CONFIG_FILE_PATH
+        XENON_RECOMP_CONFIG_FILE_PATH
     #else
         argv[1]
     #endif
@@ -24,8 +24,8 @@ int main(int argc, char* argv[])
         }
 
         const char* headerFilePath =
-#ifdef HEADER_FILE_PATH
-            HEADER_FILE_PATH
+#ifdef XENON_RECOMP_HEADER_FILE_PATH
+            XENON_RECOMP_HEADER_FILE_PATH
 #else
             argv[2]
 #endif

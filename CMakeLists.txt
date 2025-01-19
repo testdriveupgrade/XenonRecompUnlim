@@ -14,18 +14,18 @@ endif()
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 add_subdirectory(${THIRDPARTY_ROOT})
-set(POWERANALYSE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerAnalyse)
-set(POWERUTILS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerUtils)
-set(POWERRECOMP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/PowerRecomp)
+set(XENONANALYSE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/XenonAnalyse)
+set(XENONUTILS_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/XenonUtils)
+set(XENONRECOMP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/XenonRecomp)
 
-project ("PowerRecomp-ALL")
+project ("XenonRecomp-ALL")
 
-add_subdirectory(${POWERANALYSE_ROOT})
-add_subdirectory(${POWERRECOMP_ROOT})
-add_subdirectory(${POWERUTILS_ROOT})
+add_subdirectory(${XENONANALYSE_ROOT})
+add_subdirectory(${XENONRECOMP_ROOT})
+add_subdirectory(${XENONUTILS_ROOT})
 
 # Only build sample and tests if this is the top level project
 if (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
-    add_subdirectory(PowerSample)
-    add_subdirectory(PowerTests)
+    add_subdirectory(XenonSample)
+    add_subdirectory(XenonTests)
 endif()

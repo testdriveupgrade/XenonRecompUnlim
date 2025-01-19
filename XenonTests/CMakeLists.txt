@@ -1,4 +1,4 @@
-project("PowerTests")
+project("XenonTests")
 
 add_compile_options(
     "-march=x86-64-v3"
@@ -8,6 +8,6 @@ add_compile_options(
 file(GLOB TestFiles *.cpp)
 
 if(TestFiles)
-    add_executable(PowerTests ${TestFiles})
-    target_link_libraries(PowerTests PUBLIC PowerUtils)
+    add_executable(XenonTests ${TestFiles})
+    target_link_libraries(XenonTests PUBLIC XenonUtils)
 endif()
