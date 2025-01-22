@@ -118,6 +118,8 @@ void RecompilerConfig::Load(const std::string_view& configFilePath)
                 fmt::println("{}: can't mix direct and conditional return/jump", midAsmHook.name);
             }
 
+            midAsmHook.afterInstruction = table["after_instruction"].value_or(false);
+
             midAsmHooks.emplace(*table["address"].value<uint32_t>(), std::move(midAsmHook));
         }
     }

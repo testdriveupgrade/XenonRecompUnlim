@@ -333,84 +333,88 @@ bool Recompiler::Recompile(
         };
 
     auto midAsmHook = config.midAsmHooks.find(base);
-    if (midAsmHook != config.midAsmHooks.end())
-    {
-        bool returnsBool = midAsmHook->second.returnOnFalse || midAsmHook->second.returnOnTrue ||
-            midAsmHook->second.jumpAddressOnFalse != NULL || midAsmHook->second.jumpAddressOnTrue != NULL;
 
-        print("\t");
-        if (returnsBool)
-            print("if (");
-
-        print("{}(", midAsmHook->second.name);
-        for (auto& reg : midAsmHook->second.registers)
+    auto printMidAsmHook = [&]()
         {
-            if (out.back() != '(')
-                out += ", ";
+            bool returnsBool = midAsmHook->second.returnOnFalse || midAsmHook->second.returnOnTrue ||
+                midAsmHook->second.jumpAddressOnFalse != NULL || midAsmHook->second.jumpAddressOnTrue != NULL;
 
-            switch (reg[0])
+            print("\t");
+            if (returnsBool)
+                print("if (");
+
+            print("{}(", midAsmHook->second.name);
+            for (auto& reg : midAsmHook->second.registers)
             {
-            case 'c':
-                if (reg == "ctr")
-                    out += ctr();
-                else
-                    out += cr(std::atoi(reg.c_str() + 2));
-                break;
+                if (out.back() != '(')
+                    out += ", ";
 
-            case 'x':
-                out += xer();
-                break;
+                switch (reg[0])
+                {
+                case 'c':
+                    if (reg == "ctr")
+                        out += ctr();
+                    else
+                        out += cr(std::atoi(reg.c_str() + 2));
+                    break;
 
-            case 'r':
-                if (reg == "reserved")
-                    out += reserved();
-                else
-                    out += r(std::atoi(reg.c_str() + 1));
-                break;
+                case 'x':
+                    out += xer();
+                    break;
 
-            case 'f':
-                if (reg == "fpscr")
-                    out += "ctx.fpscr";
-                else
-                    out += f(std::atoi(reg.c_str() + 1));
-                break;
+                case 'r':
+                    if (reg == "reserved")
+                        out += reserved();
+                    else
+                        out += r(std::atoi(reg.c_str() + 1));
+                    break;
 
-            case 'v':
-                out += v(std::atoi(reg.c_str() + 1));
-                break;
+                case 'f':
+                    if (reg == "fpscr")
+                        out += "ctx.fpscr";
+                    else
+                        out += f(std::atoi(reg.c_str() + 1));
+                    break;
+
+                case 'v':
+                    out += v(std::atoi(reg.c_str() + 1));
+                    break;
+                }
             }
-        }
 
-        if (returnsBool)
-        {
-            println(")) {{");
+            if (returnsBool)
+            {
+                println(")) {{");
 
-            if (midAsmHook->second.returnOnTrue)
-                println("\t\treturn;");
-            else if (midAsmHook->second.jumpAddressOnTrue != NULL)
-                println("\t\tgoto loc_{:X};", midAsmHook->second.jumpAddressOnTrue);
+                if (midAsmHook->second.returnOnTrue)
+                    println("\t\treturn;");
+                else if (midAsmHook->second.jumpAddressOnTrue != NULL)
+                    println("\t\tgoto loc_{:X};", midAsmHook->second.jumpAddressOnTrue);
 
-            println("\t}}");
+                println("\t}}");
 
-            println("\telse {{");
+                println("\telse {{");
 
-            if (midAsmHook->second.returnOnFalse)
-                println("\t\treturn;");
-            else if (midAsmHook->second.jumpAddressOnFalse != NULL)
-                println("\t\tgoto loc_{:X};", midAsmHook->second.jumpAddressOnFalse);
+                if (midAsmHook->second.returnOnFalse)
+                    println("\t\treturn;");
+                else if (midAsmHook->second.jumpAddressOnFalse != NULL)
+                    println("\t\tgoto loc_{:X};", midAsmHook->second.jumpAddressOnFalse);
 
-            println("\t}}");
-        }
-        else
-        {
-            println(");");
+                println("\t}}");
+            }
+            else
+            {
+                println(");");
 
-            if (midAsmHook->second.ret)
-                println("\treturn;");
-            else if (midAsmHook->second.jumpAddress != NULL)
-                println("\tgoto loc_{:X};", midAsmHook->second.jumpAddress);
-        }
-    }
+                if (midAsmHook->second.ret)
+                    println("\treturn;");
+                else if (midAsmHook->second.jumpAddress != NULL)
+                    println("\tgoto loc_{:X};", midAsmHook->second.jumpAddress);
+            }
+        };
+
+    if (midAsmHook != config.midAsmHooks.end() && !midAsmHook->second.afterInstruction)
+        printMidAsmHook();
 
     int id = insn.opcode->id;
 
@@ -2148,6 +2152,9 @@ bool Recompiler::Recompile(
             fmt::println("{} at {:X} has RC bit enabled but no comparison was generated", insn.opcode->name, base);
     }
 #endif
+
+    if (midAsmHook != config.midAsmHooks.end() && midAsmHook->second.afterInstruction)
+        printMidAsmHook();
     
     return true;
 }

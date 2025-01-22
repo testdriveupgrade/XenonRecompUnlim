@@ -18,6 +18,8 @@ struct RecompilerMidAsmHook
     uint32_t jumpAddress = 0;
     uint32_t jumpAddressOnTrue = 0;
     uint32_t jumpAddressOnFalse = 0;
+
+    bool afterInstruction = false;
 };
 
 struct RecompilerConfig
