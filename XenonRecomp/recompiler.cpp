@@ -688,11 +688,11 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_CNTLZD:
-        println("\t{}.u64 = __lzcnt64({}.u64);", r(insn.operands[0]), r(insn.operands[1]));
+        println("\t{0}.u64 = {1}.u64 == 0 ? 64 : __builtin_clzll({1}.u64);", r(insn.operands[0]), r(insn.operands[1]));
         break;
 
     case PPC_INST_CNTLZW:
-        println("\t{}.u64 = __lzcnt32({}.u32);", r(insn.operands[0]), r(insn.operands[1]));
+        println("\t{0}.u64 = {1}.u32 == 0 ? 32 : __builtin_clz({1}.u32);", r(insn.operands[0]), r(insn.operands[1]));
         break;
 
     case PPC_INST_DB16CYC:
