@@ -105,7 +105,7 @@ struct xpointer
     {
     }
 
-    xpointer(T* ptr) : ptr(reinterpret_cast<size_t>(ptr) - reinterpret_cast<size_t>(MmGetHostAddress(0)))
+    xpointer(T* p) : ptr(p != nullptr ? (reinterpret_cast<size_t>(p) - reinterpret_cast<size_t>(MmGetHostAddress(0))) : 0)
     {
     }
 
