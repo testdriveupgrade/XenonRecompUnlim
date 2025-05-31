@@ -52,6 +52,7 @@ struct RecompilerConfig
     std::unordered_map<uint32_t, uint32_t> functions;
     std::unordered_map<uint32_t, uint32_t> invalidInstructions;
     std::unordered_map<uint32_t, RecompilerMidAsmHook> midAsmHooks;
+    std::unordered_map<uint32_t, std::string> functionAliases;
 
     void Load(const std::string_view& configFilePath);
 };
