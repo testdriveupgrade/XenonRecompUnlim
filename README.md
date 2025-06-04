@@ -1,4 +1,9 @@
-# XenonRecomp
+# XenonRecompUnlimited
+XenonRecompUnlimited - it's special fork of XenonRecomp for TDU engine, like experimental fork-version with fresh updates
+
+(unfortunattely at this moment XenonRecomp updates long-term )
+ 
+Some  new commands of PowerPC CPU checked, but other experimental
 
 XenonRecomp is a tool that converts Xbox 360 executables into C++ code, which can then be recompiled for any platform. Currently, it only supports x86 platforms due to the use of x86 intrinsics.
 
