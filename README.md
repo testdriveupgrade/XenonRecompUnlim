@@ -5,6 +5,20 @@ XenonRecompUnlimited - it's special fork of XenonRecomp for TDU engine, like exp
  
 Some  new commands of PowerPC CPU checked, but other experimental
 
+### Simplified Instructions
+
+1)Install git
+
+2)open cmd(terminal) in directory and write: git clone --recursive https://github.com/testdriveupgrade/XenonRecompUnlimited.git
+
+3)install clang-cl in Visual Studio installer (or install clang-llv)
+
+4)after that in parameter of CMAKE write (ClangCL)
+
+(to be continued...)
+
+### About XenonRecomp
+
 XenonRecomp is a tool that converts Xbox 360 executables into C++ code, which can then be recompiled for any platform. Currently, it only supports x86 platforms due to the use of x86 intrinsics.
 
 This project was heavily inspired by [N64: Recompiled](https://github.com/N64Recomp/N64Recomp), a similar tool for N64 executables.
