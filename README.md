@@ -13,7 +13,7 @@ Some  new commands of PowerPC CPU checked, but other experimental
 
 3)install clang-cl in Visual Studio installer (or install clang-llv)
 
-4)after that in parameter of CMAKE write: ClangCL
+4)install CMAKE newer than 3.2.6 and in the parameter of CMAKE write: ClangCL
 
 (to be continued...)
 
