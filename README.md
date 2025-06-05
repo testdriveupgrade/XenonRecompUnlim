@@ -71,7 +71,9 @@ Open recomiler.cpp file and write your implementation based on this:
 
 try call out of border:
 
-
+some implementatiobs of ppc commands: 
+https://github.com/rexdex/recompiler/blob/master/dev/src/xenon_decompiler/xenonCPU.cpp
+https://github.com/rexdex/recompiler/blob/master/dev/src/xenon_decompiler/xenonCPU.h
 
 first of all there 
 
