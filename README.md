@@ -5,16 +5,63 @@ XenonRecompUnlimited - it's special fork of XenonRecomp for TDU engine, like exp
  
 Some  new commands of PowerPC CPU checked, but other experimental
 
-### Simplified Instructions
+### Simplified step-by-step Instructions
+**I think default recompiler instruction too hard, because there a lot of text, that can be explained easier and a lot of not primary information, but less "obviously instructions(for some people it can be not obviously)" **
+**Due to hard instructions a lot of enthusiasts can't GET TO THE MOST INTERESTING THINGS**
 
 1)Install git
 
 2)open cmd(terminal) in directory and write: git clone --recursive https://github.com/testdriveupgrade/XenonRecompUnlimited.git
 
-3)install clang-cl in Visual Studio installer (or install clang-llv)
+3)install clang-cl in Visual Studio installer (or install clang-llvm)
 
-4)install CMAKE newer than 3.2.6 and in the parameter of CMAKE write: ClangCL
+4)install CMAKE newer or 3.20
 
+(create folder build in output) directory
+
+5)press "configure"
+
+target Visual Studio 2022
+
+(don't select x86, it should be x64(as default))
+the parameter of CMAKE write: ClangCL
+
+then "build"
+
+and after "open"
+
+5)After that in Visual Studio press "Run - green triangle"
+
+Then you get exe files of Xenon Analyse and Recomp
+
+6)file works
+
+You should convert your .iso dump to .xex file
+
+(I think patcher works not good) use xextool to uncompress and unecrypt the .xex file
+
+(IT'S VERY IMPORTANT TO WRITE DIRECTORY PATH IN SPECIFIC WAY better to use these format example:  )
+
+## About XenonAnalyser
+
+Some games have different .xex properties, for example some games contain setjmp and longjmp (can be necessary offset), but sometimes not
+
+If you get table like this it's very good: 
+
+## About XenonRecomp
+
+The goals for major recompiler:
+
+
+first of all there 
+
+##Compile output cpp files
+Use CLang++ (installed clang-cl) for compilation
+:
+
+
+**there some debug mode, can somebody give more tips? I checked the source file of recompiler.cpp and there are only 2 arguments into, how use 3 arguments?**
+ 
 (to be continued...)
 
 ### About XenonRecomp
