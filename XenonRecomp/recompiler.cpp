@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "recompiler.h"
 #include <xex_patcher.h>
+#include <sstream>
 
 static uint64_t ComputeMask(uint32_t mstart, uint32_t mstop)
 {
@@ -171,19 +172,7 @@ void Recompiler::Analyse()
     for (auto& [address, size] : config.functions)
     {
         functions.emplace_back(address, size);
-        // Check if there's a function alias for this address
-        auto aliasIt = config.functionAliases.find(address);
-        std::string symbolName;
-        if (aliasIt != config.functionAliases.end())
-        {
-            symbolName = aliasIt->second;
-        }
-        else
-        {
-            symbolName = fmt::format("sub_{:X}", address);
-        }
-
-        image.symbols.emplace(symbolName, address, size, Symbol_Function);
+        image.symbols.emplace(fmt::format("sub_{:X}", address), address, size, Symbol_Function);
     }
 
     auto& pdata = *image.Find(".pdata");
@@ -280,7 +269,7 @@ bool Recompiler::Recompile(
     // TODO: we could cache these formats in an array
     auto r = [&](size_t index)
         {
-            if ((config.nonArgumentRegistersAsLocalVariables && (index == 0 || index == 2 || index == 11 || index == 12)) || 
+            if ((config.nonArgumentRegistersAsLocalVariables && (index == 0 || index == 2 || index == 11 || index == 12)) ||
                 (config.nonVolatileRegistersAsLocalVariables && index >= 14))
             {
                 localVariables.r[index] = true;
@@ -543,13 +532,6 @@ bool Recompiler::Recompile(
             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
         break;
 
-    case PPC_INST_ADDC:
-        println("\t{}.ca = ({}.u32 + {}.u32 < {}.u32);", xer(), r(insn.operands[1]), r(insn.operands[2]), r(insn.operands[1]));
-        println("\t{}.u64 = {}.u64 + {}.u64;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
-        break;
-
     case PPC_INST_ADDE:
         println("\t{}.u8 = ({}.u32 + {}.u32 < {}.u32) | ({}.u32 + {}.u32 + {}.ca < {}.ca);", temp(), r(insn.operands[1]), r(insn.operands[2]), r(insn.operands[1]), r(insn.operands[1]), r(insn.operands[2]), xer(), xer());
         println("\t{}.u64 = {}.u64 + {}.u64 + {}.ca;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]), xer());
@@ -577,16 +559,6 @@ bool Recompiler::Recompile(
         if (insn.operands[1] != 0)
             print("{}.s64 + ", r(insn.operands[1]));
         println("{};", static_cast<int32_t>(insn.operands[2] << 16));
-        break;
-
-    case PPC_INST_ADDME:
-        println("\t{}.u64 = {}.u64 + {}.ca - 1;", temp(), r(insn.operands[1]), xer());
-        println("\t{}.ca = ({}.u64 > {}.u64) || ({}.u64 == {}.u64 && {}.ca);", xer(), 
-            r(insn.operands[1]), temp(), r(insn.operands[1]), temp(), xer());
-        println("\t{}.u64 = {}.u64;", r(insn.operands[0]), temp());
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", 
-                cr(0), r(insn.operands[0]), xer());
         break;
 
     case PPC_INST_ADDZE:
@@ -881,13 +853,6 @@ bool Recompiler::Recompile(
         // no op
         break;
 
-    case PPC_INST_EQV:
-        // rA = ~(rS XOR rB)
-        println("\t{}.u64 = ~({}.u64 ^ {}.u64);", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
-        break;
-
     case PPC_INST_EXTSB:
         println("\t{}.s64 = {}.s8;", r(insn.operands[0]), r(insn.operands[1]));
         if (strchr(insn.opcode->name, '.'))
@@ -1169,8 +1134,6 @@ bool Recompiler::Recompile(
         println("\t{}.s64 = {};", r(insn.operands[0]), int32_t(insn.operands[1] << 16));
         break;
 
-    case PPC_INST_LVEBX:
-    case PPC_INST_LVEHX:
     case PPC_INST_LVEWX:
     case PPC_INST_LVEWX128:
     case PPC_INST_LVX:
@@ -1363,22 +1326,6 @@ bool Recompiler::Recompile(
             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
         break;
 
-    case PPC_INST_MULHD:
-        println("\t{}.s64 = __mulh({}.s64, {}.s64);",
-            r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", 
-                cr(0), r(insn.operands[0]), xer());
-        break;
-    
-    case PPC_INST_MULHDU:
-        println("\t{}.u64 = __mulhu({}.u64, {}.u64);", 
-            r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", 
-                cr(0), r(insn.operands[0]), xer());
-        break;
-
     case PPC_INST_NAND:
         println("\t{}.u64 = ~({}.u64 & {}.u64);", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
         break;
@@ -1445,14 +1392,6 @@ bool Recompiler::Recompile(
 
     case PPC_INST_RLWINM:
         println("\t{}.u64 = __builtin_rotateleft64({}.u32 | ({}.u64 << 32), {}) & 0x{:X};", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[1]), insn.operands[2], ComputeMask(insn.operands[3] + 32, insn.operands[4] + 32));
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
-        break;
-
-    case PPC_INST_RLWNM:
-        println("\t{}.u64 = __builtin_rotateleft64({}.u32 | ({}.u64 << 32), {}.u8 & 0x1F) & 0x{:X};", 
-            r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[1]), 
-            r(insn.operands[2]), ComputeMask(insn.operands[3] + 32, insn.operands[4] + 32));
         if (strchr(insn.opcode->name, '.'))
             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
         break;
@@ -1772,235 +1711,28 @@ bool Recompiler::Recompile(
         println("\t{}.s64 = {} - {}.s64;", r(insn.operands[0]), int32_t(insn.operands[2]), r(insn.operands[1]));
         break;
 
-    case PPC_INST_SUBFME:
-        println("\t{}.u64 = ~{}.u64 + {}.ca - 1;", temp(), r(insn.operands[1]), xer());
-        println("\t{}.ca = ({}.u64 < ~{}.u64) || ({}.u64 == ~{}.u64 && {}.ca);", xer(), 
-            temp(), r(insn.operands[1]), temp(), r(insn.operands[1]), xer());
-        println("\t{}.u64 = {}.u64;", r(insn.operands[0]), temp());
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", 
-                cr(0), r(insn.operands[0]), xer());
-        break;
-
-    case PPC_INST_SUBFZE:
-        println("\t{}.u64 = ~{}.u64 + {}.ca;", temp(), r(insn.operands[1]), xer());
-        println("\t{}.ca = {}.u64 < {}.ca;", xer(), temp(), xer());
-        println("\t{}.u64 = {}.u64;", r(insn.operands[0]), temp());
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
-        break;
-
     case PPC_INST_SYNC:
         // no op
         break;
 
-    case PPC_INST_TDEQ:
-        println("\tif ({}.u64 == {}.u64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDEQI:
-        println("\tif ({}.u64 == {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TDGE:
-        println("\tif ({}.s64 >= {}.s64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDGEI:
-        println("\tif ({}.s64 >= {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDGT:
-        println("\tif ({}.s64 > {}.s64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDGTI:
-        println("\tif ({}.s64 > {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDLE:
-        println("\tif ({}.s64 <= {}.s64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDLEI:
-        println("\tif ({}.s64 <= {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDLGE:
-        println("\tif ({}.u64 >= {}.u64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
     case PPC_INST_TDLGEI:
-        println("\tif ({}.u64 >= {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TDLGT:
-        println("\tif ({}.u64 > {}.u64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDLGTI:
-        println("\tif ({}.u64 > {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TDLLE:
-        println("\tif ({}.u64 <= {}.u64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
+        // no op
         break;
 
     case PPC_INST_TDLLEI:
-        println("\tif ({}.u64 <= {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
+        // no op
         break;
 
-    case PPC_INST_TDLLT:
-        println("\tif ({}.u64 < {}.u64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDLLTI:
-        println("\tif ({}.u64 < {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TDLT:
-        println("\tif ({}.s64 < {}.s64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDLTI:
-        println("\tif ({}.s64 < {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDNE:
-        println("\tif ({}.u64 != {}.u64) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TDNEI:
-        println("\tif ({}.u64 != {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
     case PPC_INST_TWI:
-    {
-        // TO field specifies trap conditions:
-        // Bit 0 (16): Less than (signed)
-        // Bit 1 (8): Greater than (signed)  
-        // Bit 2 (4): Equal
-        // Bit 3 (2): Less than (unsigned)
-        // Bit 4 (1): Greater than (unsigned)
-        
-        bool first = true;
-        print("\tif (");
-        
-        if (insn.operands[0] & 16) {
-            print("{}.s32 < {}", r(insn.operands[1]), int32_t(insn.operands[2]));
-            first = false;
-        }
-        
-        if (insn.operands[0] & 8) {
-            if (!first) print(" || ");
-            print("{}.s32 > {}", r(insn.operands[1]), int32_t(insn.operands[2]));
-            first = false;
-        }
-        
-        if (insn.operands[0] & 4) {
-            if (!first) print(" || ");
-            print("{}.u32 == {}", r(insn.operands[1]), insn.operands[2]);
-            first = false;
-        }
-        
-        if (insn.operands[0] & 2) {
-            if (!first) print(" || ");
-            print("{}.u32 < {}", r(insn.operands[1]), insn.operands[2]);
-            first = false;
-        }
-        
-        if (insn.operands[0] & 1) {
-            if (!first) print(" || ");
-            print("{}.u32 > {}", r(insn.operands[1]), insn.operands[2]);
-            first = false;
-        }
-        
-        if (first) {
-            // TO = 0 means never trap
-            println("false) __builtin_debugtrap();");
-        } else {
-            println(") __builtin_debugtrap();");
-        }
-    }
-    break;
-
-    case PPC_INST_TWEQ:
-        println("\tif ({}.u32 == {}.u32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWEQI:
-        println("\tif ({}.u32 == {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TWGE:
-        println("\tif ({}.s32 >= {}.s32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWGEI:
-        println("\tif ({}.s32 >= {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWGT:
-        println("\tif ({}.s32 > {}.s32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWGTI:
-        println("\tif ({}.s32 > {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWLE:
-        println("\tif ({}.s32 <= {}.s32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWLEI:
-        println("\tif ({}.s32 <= {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWLGE:
-        println("\tif ({}.u32 >= {}.u32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
+        // no op
         break;
 
     case PPC_INST_TWLGEI:
-        println("\tif ({}.u32 >= {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TWLGT:
-        println("\tif ({}.u32 > {}.u32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWLGTI:
-        println("\tif ({}.u32 > {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TWLLE:
-        println("\tif ({}.u32 <= {}.u32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
+        // no op
         break;
 
     case PPC_INST_TWLLEI:
-        println("\tif ({}.u32 <= {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TWLLT:
-        println("\tif ({}.u32 < {}.u32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWLLTI:
-        println("\tif ({}.u32 < {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_TWLT:
-        println("\tif ({}.s32 < {}.s32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWLTI:
-        println("\tif ({}.s32 < {}) __builtin_debugtrap();", r(insn.operands[0]), int32_t(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWNE:
-        println("\tif ({}.u32 != {}.u32) __builtin_debugtrap();", r(insn.operands[0]), r(insn.operands[1]));
-        break;
-
-    case PPC_INST_TWNEI:
-        println("\tif ({}.u32 != {}) __builtin_debugtrap();", r(insn.operands[0]), insn.operands[1]);
+        // no op
         break;
 
     case PPC_INST_VADDFP:
@@ -2038,7 +1770,6 @@ bool Recompiler::Recompile(
         println("\t_mm_store_si128((__m128i*){}.u8, _mm_and_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
-    case PPC_INST_VANDC:
     case PPC_INST_VANDC128:
         println("\t_mm_store_si128((__m128i*){}.u8, _mm_andnot_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
         break;
@@ -2055,25 +1786,10 @@ bool Recompiler::Recompile(
         println("\t_mm_store_si128((__m128i*){}.u8, _mm_avg_epu8(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
-    case PPC_INST_VAVGUH:
-        println("\t_mm_store_si128((__m128i*){}.u16, _mm_avg_epu16(_mm_load_si128((__m128i*){}.u16), _mm_load_si128((__m128i*){}.u16)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        break;
-
     case PPC_INST_VCTSXS:
     case PPC_INST_VCFPSXWS128:
         printSetFlushMode(true);
         print("\t_mm_store_si128((__m128i*){}.s32, _mm_vctsxs(", v(insn.operands[0]));
-        if (insn.operands[2] != 0)
-            println("_mm_mul_ps(_mm_load_ps({}.f32), _mm_set1_ps({}))));", v(insn.operands[1]), 1u << insn.operands[2]);
-        else
-            println("_mm_load_ps({}.f32)));", v(insn.operands[1]));
-        break;
-
-    case PPC_INST_VCTUXS:
-    case PPC_INST_VCFPUXWS128:
-        printSetFlushMode(true);
-        print("\t_mm_store_si128((__m128i*){}.u32, _mm_vctuxs(", v(insn.operands[0]));
         if (insn.operands[2] != 0)
             println("_mm_mul_ps(_mm_load_ps({}.f32), _mm_set1_ps({}))));", v(insn.operands[1]), 1u << insn.operands[2]);
         else
@@ -2116,11 +1832,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_VCMPBFP:
     case PPC_INST_VCMPBFP128:
-        printSetFlushMode(true);
-        println("\t_mm_store_ps({}.f32, _mm_vcmpbfp(_mm_load_ps({}.f32), _mm_load_ps({}.f32)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        if (strchr(insn.opcode->name, '.'))
-            println("\t{}.setFromMask(_mm_load_ps({}.f32), 0xF);", cr(6), v(insn.operands[0]));
+        println("\t__builtin_debugtrap();");
         break;
 
     case PPC_INST_VCMPEQFP:
@@ -2197,34 +1909,14 @@ bool Recompiler::Recompile(
         println("\t_mm_store_ps({}.f32, _mm_max_ps(_mm_load_ps({}.f32), _mm_load_ps({}.f32)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
-    case PPC_INST_VMAXSH:
-        println("\t_mm_store_si128((__m128i*){}.s16, _mm_max_epi16(_mm_load_si128((__m128i*){}.s16), _mm_load_si128((__m128i*){}.s16)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        break;
-
     case PPC_INST_VMAXSW:
         println("\t_mm_store_si128((__m128i*){}.u32, _mm_max_epi32(_mm_load_si128((__m128i*){}.u32), _mm_load_si128((__m128i*){}.u32)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        break;
-
-    case PPC_INST_VMAXUH:
-        println("\t_mm_store_si128((__m128i*){}.u16, _mm_max_epu16(_mm_load_si128((__m128i*){}.u16), _mm_load_si128((__m128i*){}.u16)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
     case PPC_INST_VMINFP:
     case PPC_INST_VMINFP128:
         printSetFlushMode(true);
         println("\t_mm_store_ps({}.f32, _mm_min_ps(_mm_load_ps({}.f32), _mm_load_ps({}.f32)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        break;
-
-    case PPC_INST_VMINSH:
-        println("\t_mm_store_si128((__m128i*){}.s16, _mm_min_epi16(_mm_load_si128((__m128i*){}.s16), _mm_load_si128((__m128i*){}.s16)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        break;
-
-    case PPC_INST_VMINUH:
-        println("\t_mm_store_si128((__m128i*){}.u16, _mm_min_epu16(_mm_load_si128((__m128i*){}.u16), _mm_load_si128((__m128i*){}.u16)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
     case PPC_INST_VMRGHB:
@@ -2329,19 +2021,19 @@ bool Recompiler::Recompile(
 
             for (size_t i = 0; i < 4; i++)
             {
-        		// Strip sign from source
-        		println("\t{}.u32 = ({}.u32[{}]&0x7FFFFFFF);", temp(), v(insn.operands[1]), i);
-        		// If |source| is > 65504, clamp output to 0x7FFF, else save 8 exponent bits 
-        		println("\t{0}.u8[0] = ({1}.f32 != {1}.f32) || ({1}.f32 > 65504.0f) ? 0xFF : (({2}.u32[{3}]&0x7f800000)>>23);", vTemp(), temp(), v(insn.operands[1]), i);
-        		// If 8 exponent bits were saved, it can only be 0x8E at most
-        		// If saved, save first 10 bits of mantissa
-        		println("\t{}.u16 = {}.u8[0] != 0xFF ? (({}.u32[{}]&0x7FE000)>>13) : 0x0;", temp(), vTemp(), v(insn.operands[1]), i);
-        		// If saved and > 127-15, exponent is converted from 8 to 5-bit by subtracting 0x70
-        		// If saved but not > 127-15, clamp exponent at 0, add 0x400 to mantissa and shift right by (0x71-exponent)
-        		// If right shift is greater than 31 bits, manually clamp mantissa to 0 or else the output of the shift will be wrong
-        		println("\t{0}.u16[{1}] = {2}.u8[0] != 0xFF ? ({2}.u8[0] > 0x70 ? ((({2}.u8[0]-0x70)<<10)+{3}.u16) : (0x71-{2}.u8[0] > 31 ? 0x0 : ((0x400+{3}.u16)>>(0x71-{2}.u8[0])))) : 0x7FFF;", v(insn.operands[0]), i+(2*insn.operands[4]), vTemp(), temp());
-        		// Add back original sign
-        		println("\t{}.u16[{}] |= (({}.u32[{}]&0x80000000)>>16);", v(insn.operands[0]), i+(2*insn.operands[4]), v(insn.operands[1]), i);
+                // Strip sign from source
+                println("\t{}.u32 = ({}.u32[{}]&0x7FFFFFFF);", temp(), v(insn.operands[1]), i);
+                // If |source| is > 65504, clamp output to 0x7FFF, else save 8 exponent bits 
+                println("\t{0}.u8[0] = ({1}.f32 != {1}.f32) || ({1}.f32 > 65504.0f) ? 0xFF : (({2}.u32[{3}]&0x7f800000)>>23);", vTemp(), temp(), v(insn.operands[1]), i);
+                // If 8 exponent bits were saved, it can only be 0x8E at most
+                // If saved, save first 10 bits of mantissa
+                println("\t{}.u16 = {}.u8[0] != 0xFF ? (({}.u32[{}]&0x7FE000)>>13) : 0x0;", temp(), vTemp(), v(insn.operands[1]), i);
+                // If saved and > 127-15, exponent is converted from 8 to 5-bit by subtracting 0x70
+                // If saved but not > 127-15, clamp exponent at 0, add 0x400 to mantissa and shift right by (0x71-exponent)
+                // If right shift is greater than 31 bits, manually clamp mantissa to 0 or else the output of the shift will be wrong
+                println("\t{0}.u16[{1}] = {2}.u8[0] != 0xFF ? ({2}.u8[0] > 0x70 ? ((({2}.u8[0]-0x70)<<10)+{3}.u16) : (0x71-{2}.u8[0] > 31 ? 0x0 : ((0x400+{3}.u16)>>(0x71-{2}.u8[0])))) : 0x7FFF;", v(insn.operands[0]), i + (2 * insn.operands[4]), vTemp(), temp());
+                // Add back original sign
+                println("\t{}.u16[{}] |= (({}.u32[{}]&0x80000000)>>16);", v(insn.operands[0]), i + (2 * insn.operands[4]), v(insn.operands[1]), i);
             }
             break;
 
@@ -2351,78 +2043,9 @@ bool Recompiler::Recompile(
         }
         break;
 
-    case PPC_INST_VPKSHSS:
-    case PPC_INST_VPKSHSS128:
-        println("\t_mm_store_si128((__m128i*){}.s8, _mm_packs_epi16(_mm_load_si128((__m128i*){}.s16), _mm_load_si128((__m128i*){}.s16)));", 
-            v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
-        break;
-
     case PPC_INST_VPKSHUS:
     case PPC_INST_VPKSHUS128:
         println("\t_mm_store_si128((__m128i*){}.u8, _mm_packus_epi16(_mm_load_si128((__m128i*){}.s16), _mm_load_si128((__m128i*){}.s16)));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
-        break;
-
-    case PPC_INST_VPKSWSS:
-    case PPC_INST_VPKSWSS128:
-        println("\t_mm_store_si128((__m128i*){}.s16, _mm_packs_epi32(_mm_load_si128((__m128i*){}.s32), _mm_load_si128((__m128i*){}.s32)));", 
-            v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
-        break;
-
-    case PPC_INST_VPKSWUS:
-    case PPC_INST_VPKSWUS128:
-        println("\t_mm_store_si128((__m128i*){}.s32, _mm_load_si128((__m128i*){}.s32));", vTemp(), v(insn.operands[2]));
-        for (int i = 0; i < 4; i++) {
-            println("\t{}.u16[{}] = {}.s32[{}] < 0 ? 0 : ({}.s32[{}] > 0xFFFF ? 0xFFFF : {}.s32[{}]);",
-                v(insn.operands[0]), i, vTemp(), i, vTemp(), i, vTemp(), i);
-        }
-        println("\t_mm_store_si128((__m128i*){}.s32, _mm_load_si128((__m128i*){}.s32));", vTemp(), v(insn.operands[1]));
-        for (int i = 0; i < 4; i++) {
-            println("\t{}.u16[{}] = {}.s32[{}] < 0 ? 0 : ({}.s32[{}] > 0xFFFF ? 0xFFFF : {}.s32[{}]);",
-                v(insn.operands[0]), i + 4, vTemp(), i, vTemp(), i, vTemp(), i);
-        }
-        break;
-
-    case PPC_INST_VPKUHUM:
-        // Pack without saturation - use shuffle to select lower bytes
-        println("\t_mm_store_si128((__m128i*){}.u8, _mm_packus_epi16("
-            "_mm_and_si128(_mm_load_si128((__m128i*){}.u16), _mm_set1_epi16(0xFF)), "
-            "_mm_and_si128(_mm_load_si128((__m128i*){}.u16), _mm_set1_epi16(0xFF))));",
-            v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
-        break;
-
-    case PPC_INST_VPKUHUS:
-    case PPC_INST_VPKUHUS128:
-        // Pack unsigned halfwords to unsigned bytes with saturation
-        println("\t_mm_store_si128((__m128i*){}.u8, _mm_packus_epi16(_mm_load_si128((__m128i*){}.u16), _mm_load_si128((__m128i*){}.u16)));", 
-            v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
-        break;
-
-    case PPC_INST_VPKUWUM:
-    case PPC_INST_VPKUWUM128:
-        println("\t_mm_store_si128((__m128i*){}.u32, _mm_load_si128((__m128i*){}.u32));", vTemp(), v(insn.operands[2]));
-        for (int i = 0; i < 4; i++) {
-            println("\t{}.u16[{}] = {}.u16[{}];", 
-                v(insn.operands[0]), i, vTemp(), i*2);
-        }
-        println("\t_mm_store_si128((__m128i*){}.u32, _mm_load_si128((__m128i*){}.u32));", vTemp(), v(insn.operands[1]));
-        for (int i = 0; i < 4; i++) {
-            println("\t{}.u16[{}] = {}.u16[{}];", 
-                v(insn.operands[0]), i + 4, vTemp(), i*2);
-        }
-        break;
-
-    case PPC_INST_VPKUWUS:
-    case PPC_INST_VPKUWUS128:
-        println("\t_mm_store_si128((__m128i*){}.u32, _mm_load_si128((__m128i*){}.u32));", vTemp(), v(insn.operands[2]));
-        for (int i = 0; i < 4; i++) {
-            println("\t{}.u16[{}] = {}.u32[{}] > 0xFFFF ? 0xFFFF : {}.u32[{}];",
-                v(insn.operands[0]), i, vTemp(), i, vTemp(), i);
-        }
-        println("\t_mm_store_si128((__m128i*){}.u32, _mm_load_si128((__m128i*){}.u32));", vTemp(), v(insn.operands[1]));
-        for (int i = 0; i < 4; i++) {
-            println("\t{}.u16[{}] = {}.u32[{}] > 0xFFFF ? 0xFFFF : {}.u32[{}];",
-                v(insn.operands[0]), i + 4, vTemp(), i, vTemp(), i);
-        }
         break;
 
     case PPC_INST_VREFP:
@@ -2450,13 +2073,14 @@ bool Recompiler::Recompile(
         println("\t_mm_store_ps({}.f32, _mm_round_ps(_mm_load_ps({}.f32), _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC));", v(insn.operands[0]), v(insn.operands[1]));
         break;
 
+        /*
     case PPC_INST_VRLIMI128:
     {
         constexpr size_t shuffles[] = { _MM_SHUFFLE(3, 2, 1, 0), _MM_SHUFFLE(2, 1, 0, 3), _MM_SHUFFLE(1, 0, 3, 2), _MM_SHUFFLE(0, 3, 2, 1) };
         println("\t_mm_store_ps({}.f32, _mm_blend_ps(_mm_load_ps({}.f32), _mm_permute_ps(_mm_load_ps({}.f32), {}), {}));", v(insn.operands[0]), v(insn.operands[0]), v(insn.operands[1]), shuffles[insn.operands[3]], insn.operands[2]);
         break;
     }
-
+    */
     case PPC_INST_VRSQRTEFP:
     case PPC_INST_VRSQRTEFP128:
         // TODO: see if we can use rsqrt safely
@@ -2466,49 +2090,13 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_VSEL:
-    case PPC_INST_VSEL128:
         println("\t_mm_store_si128((__m128i*){}.u8, _mm_or_si128(_mm_andnot_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)), _mm_and_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8))));", v(insn.operands[0]), v(insn.operands[3]), v(insn.operands[1]), v(insn.operands[3]), v(insn.operands[2]));
-        break;
-
-    case PPC_INST_VSL:
-        println("\t_mm_store_si128((__m128i*){}.u8, _mm_vsl(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
     case PPC_INST_VSLB:
         // TODO: vectorize
         for (size_t i = 0; i < 16; i++)
             println("\t{}.u8[{}] = {}.u8[{}] << ({}.u8[{}] & 0x7);", v(insn.operands[0]), i, v(insn.operands[1]), i, v(insn.operands[2]), i);
-        break;
-
-    case PPC_INST_VSLH:
-        // Vector shift left halfword
-        for (size_t i = 0; i < 8; i++)
-            println("\t{}.u16[{}] = {}.u16[{}] << ({}.u16[{}] & 0xF);", 
-                v(insn.operands[0]), i, v(insn.operands[1]), i, v(insn.operands[2]), i);
-        break;
-
-    case PPC_INST_VSRAH:
-        // Vector shift right algebraic halfword
-        for (size_t i = 0; i < 8; i++)
-            println("\t{}.s16[{}] = {}.s16[{}] >> ({}.u16[{}] & 0xF);", 
-                v(insn.operands[0]), i, v(insn.operands[1]), i, v(insn.operands[2]), i);
-        break;
-
-    case PPC_INST_VSRH:
-        // Vector shift right halfword
-        for (size_t i = 0; i < 8; i++)
-            println("\t{}.u16[{}] = {}.u16[{}] >> ({}.u16[{}] & 0xF);", 
-                v(insn.operands[0]), i, v(insn.operands[1]), i, v(insn.operands[2]), i);
-        break;
-
-    case PPC_INST_VRLH:
-        // Vector rotate left halfword
-        for (size_t i = 0; i < 8; i++)
-            println("\t{}.u16[{}] = ({}.u16[{}] << ({}.u16[{}] & 0xF)) | "
-                "({}.u16[{}] >> (16 - ({}.u16[{}] & 0xF)));", 
-                v(insn.operands[0]), i, v(insn.operands[1]), i, v(insn.operands[2]), i,
-                v(insn.operands[1]), i, v(insn.operands[2]), i);
         break;
 
     case PPC_INST_VSLDOI:
@@ -2542,11 +2130,6 @@ bool Recompiler::Recompile(
 
     case PPC_INST_VSPLTISB:
         println("\t_mm_store_si128((__m128i*){}.u8, _mm_set1_epi8(char(0x{:X})));", v(insn.operands[0]), insn.operands[1]);
-        break;
-
-    case PPC_INST_VSPLTISH:
-        println("\t_mm_store_si128((__m128i*){}.s16, _mm_set1_epi16(short({})));", 
-            v(insn.operands[0]), int16_t(insn.operands[1]));
         break;
 
     case PPC_INST_VSPLTISW:
@@ -2586,11 +2169,6 @@ bool Recompiler::Recompile(
     case PPC_INST_VSUBFP128:
         printSetFlushMode(true);
         println("\t_mm_store_ps({}.f32, _mm_sub_ps(_mm_load_ps({}.f32), _mm_load_ps({}.f32)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
-        break;
-
-    case PPC_INST_VSUBSHS:
-        println("\t_mm_store_si128((__m128i*){}.s16, _mm_subs_epi16(_mm_load_si128((__m128i*){}.s16), _mm_load_si128((__m128i*){}.s16)));", 
-            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
     case PPC_INST_VSUBSWS:
@@ -2687,6 +2265,169 @@ bool Recompiler::Recompile(
         println("\t{}.u64 = {}.u64 ^ {};", r(insn.operands[0]), r(insn.operands[1]), insn.operands[2] << 16);
         break;
 
+    case PPC_INST_BSO:
+        printConditionalBranch(false, "so");
+        break;
+
+    case PPC_INST_BSOLR:
+        println("\tif ({}.so) return;", cr(insn.operands[0]));
+        break;
+
+    case PPC_INST_BNS:
+        printConditionalBranch(true, "so");
+        break;
+
+    case PPC_INST_BNSLR:
+        println("\tif (!{}.so) return;", cr(insn.operands[0]));
+        break;
+
+        /*
+
+    case PPC_INST_STFSU:
+        printSetFlushMode(false);
+        println("\t{}.f32 = float({}.f64);", temp(), f(insn.operands[0]));
+        println("\t{} = {} + {}.u32;", ea(), int32_t(insn.operands[1]), r(insn.operands[2]));
+        println("\t{}{}, {}.u32);", mmioStore() ? "PPC_MM_STORE_U32(" : "PPC_STORE_U32(", ea(), temp());
+        println("\t{}.u32 = {};", r(insn.operands[2]), ea());
+        break;
+
+    case PPC_INST_VANDC:
+ //   case PPC_INST_VANDC128:
+        println("\tsimd::store_u8({}.u8, simd::andnot_u8(simd::load_u8({}.u8), simd::load_u8({}.u8)));",
+            v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));  // NOTE: swapped arg order!
+        break;
+
+        case PPC_INST_EQV: {
+        const auto& dst = r(insn.operands[0]);
+        const auto& lhs = r(insn.operands[1]);
+        const auto& rhs = r(insn.operands[2]);
+
+        println("\t{} = simd::xor_i32({}, {});", dst, lhs, rhs);
+        println("\t{} = simd::andnot_i64({}, -1);", dst, dst);
+
+        if (insn.opcode->name && strchr(insn.opcode->name, '.')) {
+            println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), dst, xer());
+        }
+        break;
+    }
+
+    case PPC_INST_FRSQRTE:
+        printSetFlushMode(true);
+        println("\t{}.f64 = simd::rsqrt_f64({}.f64);", f(insn.operands[0]), f(insn.operands[1]));
+        break;
+
+        */
+    case PPC_INST_DCBST:
+        // no op
+        break;
+
+    case PPC_INST_EQV:
+        // rA = ~(rS XOR rB)
+        println("\t{}.u64 = ~({}.u64 ^ {}.u64);", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+        if (strchr(insn.opcode->name, '.'))
+            println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
+        break;
+
+
+
+    case PPC_INST_MULHD:
+        println("\t{}.s64 = __mulh({}.s64, {}.s64);",
+            r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+        if (strchr(insn.opcode->name, '.'))
+            println("\t{}.compare<int32_t>({}.s32, 0, {});",
+                cr(0), r(insn.operands[0]), xer());
+        break;
+
+    case PPC_INST_MULHDU:
+        println("\t{}.u64 = __mulhu({}.u64, {}.u64);",
+            r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+        if (strchr(insn.opcode->name, '.'))
+            println("\t{}.compare<int32_t>({}.s32, 0, {});",
+                cr(0), r(insn.operands[0]), xer());
+        break;
+
+    case PPC_INST_VPKSWSS:
+    case PPC_INST_VPKSWSS128:
+        println("\t_mm_store_si128((__m128i*){}.s16, _mm_packs_epi32(_mm_load_si128((__m128i*){}.s32), _mm_load_si128((__m128i*){}.s32)));",
+            v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
+        break;
+
+
+
+   // case PPC_INST_VSEL:
+    case PPC_INST_VSEL128:
+        println("\t_mm_store_si128((__m128i*){}.u8, _mm_or_si128(_mm_andnot_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)), _mm_and_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8))));", v(insn.operands[0]), v(insn.operands[3]), v(insn.operands[1]), v(insn.operands[3]), v(insn.operands[2]));
+        break;
+
+
+    case PPC_INST_VRLIMI128:
+    {
+        constexpr size_t shuffles[] = { _MM_SHUFFLE(3, 2, 1, 0), _MM_SHUFFLE(2, 1, 0, 3), _MM_SHUFFLE(1, 0, 3, 2), _MM_SHUFFLE(0, 3, 2, 1) };
+        println("\t_mm_store_ps({}.f32, _mm_blend_ps(_mm_load_ps({}.f32), _mm_permute_ps(_mm_load_ps({}.f32), {}), {}));", v(insn.operands[0]), v(insn.operands[0]), v(insn.operands[1]), shuffles[insn.operands[3]], insn.operands[2]);
+        break;
+    }
+
+    case PPC_INST_VANDC:
+   // case PPC_INST_VANDC128:
+        println("\t_mm_store_si128((__m128i*){}.u8, _mm_andnot_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
+        break;
+
+
+
+   
+    case PPC_INST_FNMADD:
+        printSetFlushMode(false);
+        println("\t{}.f64 = -std::fma({}.f64, {}.f64, {}.f64);", f(insn.operands[0]), f(insn.operands[1]), f(insn.operands[2]), f(insn.operands[3]));
+        if (strchr(insn.opcode->name, '.'))
+            println("\tctx.fpscr.setFlags({}.f64);", f(insn.operands[0]));
+        break;
+
+    case PPC_INST_STFSU:
+        printSetFlushMode(false);
+        println("\t{}.f32 = float({}.f64);", temp(), f(insn.operands[0]));
+        println("\t{} = {} + {}.u32;", ea(), int32_t(insn.operands[1]), r(insn.operands[2]));
+        println("\t{}{}, {}.u32);", mmioStore() ? "PPC_MM_STORE_U32(" : "PPC_STORE_U32(", ea(), temp());
+        println("\t{}.u32 = {};", r(insn.operands[2]), ea());
+        break;
+        /*
+    case PPC_INST_FRSQRTE: //try not use simd::
+        printSetFlushMode(true);
+        println("\t{}.f64 = simd::rsqrt_f64({}.f64);", f(insn.operands[0]), f(insn.operands[1]));
+        break;
+
+
+       
+    case PPC_INST_LHBRX:
+        println("\t{}.u16 = __builtin_bswap16(mem::loadVolatileU16<true>(base + {}.u32 + {}.u32));",
+            r(insn.operands[0]),
+            r(insn.operands[1] == 0 ? 0 : insn.operands[1]),
+            r(insn.operands[2]));
+        break;
+
+    case PPC_INST_VMINSW:
+        printSetFlushMode(true);
+        println("\t{}.v128 = simd::min_i32({}.v128, {}.v128);",
+            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
+        break;
+
+        */
+    case PPC_INST_VMINSW:
+        // no op
+        break;
+
+    case PPC_INST_FRSQRTE: //try not use simd::
+        println("\t{}.f64 = 1.0 / sqrt({}.f64);", r(insn.operands[0]), r(insn.operands[1]));
+        break;
+
+    case PPC_INST_LHBRX:
+        print("\t{}.u64 = __builtin_bswap16(PPC_LOAD_U16(", r(insn.operands[0]));
+        if (insn.operands[1] != 0)
+            print("{}.u32 + ", r(insn.operands[1]));
+        println("{}.u32));", r(insn.operands[2]));
+        break;
+
+
+
     default:
         return false;
     }
@@ -2702,7 +2443,7 @@ bool Recompiler::Recompile(
 
     if (midAsmHook != config.midAsmHooks.end() && midAsmHook->second.afterInstruction)
         printMidAsmHook();
-    
+
     return true;
 }
 
@@ -2786,9 +2527,9 @@ bool Recompiler::Recompile(const Function& fn)
             println(");\n");
 
             if (midAsmHook->second.jumpAddress != NULL)
-                labels.emplace(midAsmHook->second.jumpAddress);       
+                labels.emplace(midAsmHook->second.jumpAddress);
             if (midAsmHook->second.jumpAddressOnTrue != NULL)
-                labels.emplace(midAsmHook->second.jumpAddressOnTrue);    
+                labels.emplace(midAsmHook->second.jumpAddressOnTrue);
             if (midAsmHook->second.jumpAddressOnFalse != NULL)
                 labels.emplace(midAsmHook->second.jumpAddressOnFalse);
         }
@@ -2796,13 +2537,7 @@ bool Recompiler::Recompile(const Function& fn)
 
     auto symbol = image.symbols.find(fn.base);
     std::string name;
-    auto aliasIt = config.functionAliases.find(fn.base);
-
-    if (aliasIt != config.functionAliases.end())
-    {
-        name = aliasIt->second;
-    }
-    else if (symbol != image.symbols.end())
+    if (symbol != image.symbols.end())
     {
         name = symbol->name;
     }
@@ -2883,7 +2618,7 @@ bool Recompiler::Recompile(const Function& fn)
 
     std::swap(out, tempString);
     if (localVariables.ctr)
-        println("\tPPCRegister ctr{{}};");   
+        println("\tPPCRegister ctr{{}};");
     if (localVariables.xer)
         println("\tPPCXERRegister xer{{}};");
     if (localVariables.reserved)
@@ -2914,11 +2649,11 @@ bool Recompiler::Recompile(const Function& fn)
     }
 
     if (localVariables.env)
-        println("\tPPCContext env{{}};"); 
-    
+        println("\tPPCContext env{{}};");
+
     if (localVariables.temp)
-        println("\tPPCRegister temp{{}};"); 
-    
+        println("\tPPCRegister temp{{}};");
+
     if (localVariables.vTemp)
         println("\tPPCVRegister vTemp{{}};");
 
@@ -2941,19 +2676,19 @@ void Recompiler::Recompile(const std::filesystem::path& headerFilePath)
         println("#define PPC_CONFIG_H_INCLUDED\n");
 
         if (config.skipLr)
-            println("#define PPC_CONFIG_SKIP_LR");      
+            println("#define PPC_CONFIG_SKIP_LR");
         if (config.ctrAsLocalVariable)
-            println("#define PPC_CONFIG_CTR_AS_LOCAL");      
+            println("#define PPC_CONFIG_CTR_AS_LOCAL");
         if (config.xerAsLocalVariable)
-            println("#define PPC_CONFIG_XER_AS_LOCAL");      
+            println("#define PPC_CONFIG_XER_AS_LOCAL");
         if (config.reservedRegisterAsLocalVariable)
-            println("#define PPC_CONFIG_RESERVED_AS_LOCAL");      
+            println("#define PPC_CONFIG_RESERVED_AS_LOCAL");
         if (config.skipMsr)
-            println("#define PPC_CONFIG_SKIP_MSR");      
+            println("#define PPC_CONFIG_SKIP_MSR");
         if (config.crRegistersAsLocalVariables)
-            println("#define PPC_CONFIG_CR_AS_LOCAL");      
+            println("#define PPC_CONFIG_CR_AS_LOCAL");
         if (config.nonArgumentRegistersAsLocalVariables)
-            println("#define PPC_CONFIG_NON_ARGUMENT_AS_LOCAL");   
+            println("#define PPC_CONFIG_NON_ARGUMENT_AS_LOCAL");
         if (config.nonVolatileRegistersAsLocalVariables)
             println("#define PPC_CONFIG_NON_VOLATILE_AS_LOCAL");
 
@@ -2961,7 +2696,7 @@ void Recompiler::Recompile(const std::filesystem::path& headerFilePath)
 
         println("#define PPC_IMAGE_BASE 0x{:X}ull", image.base);
         println("#define PPC_IMAGE_SIZE 0x{:X}ull", image.size);
-        
+
         // Extract the address of the minimum code segment to store the function table at.
         size_t codeMin = ~0;
         size_t codeMax = 0;
@@ -2996,7 +2731,7 @@ void Recompiler::Recompile(const std::filesystem::path& headerFilePath)
         println("#pragma once");
 
         println("#include \"ppc_config.h\"\n");
-        
+
         std::ifstream stream(headerFilePath);
         if (stream.good())
         {
