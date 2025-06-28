@@ -2416,7 +2416,8 @@ bool Recompiler::Recompile(
         break;
 
     case PPC_INST_FRSQRTE: //try not use simd::
-        println("\t{}.f64 = 1.0 / sqrt({}.f64);", r(insn.operands[0]), r(insn.operands[1]));
+           printSetFlushMode(false);
+        println("\t{}.f64 = double(1.0f / sqrtf(float({}.f64)));", f(insn.operands[0]), f(insn.operands[1]));
         break;
 
     case PPC_INST_LHBRX:
