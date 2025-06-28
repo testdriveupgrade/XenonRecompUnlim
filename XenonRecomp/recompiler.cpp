@@ -1967,6 +1967,12 @@ bool Recompiler::Recompile(
         println("\t_mm_store_ps({}.f32, _mm_xor_ps(_mm_sub_ps(_mm_mul_ps(_mm_load_ps({}.f32), _mm_load_ps({}.f32)), _mm_load_ps({}.f32)), _mm_castsi128_ps(_mm_set1_epi32(int(0x80000000)))));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]), v(insn.operands[3]));
         break;
 
+    case PPC_INST_VNOR:
+    case PPC_INST_VNOR128:
+        println("\t_mm_store_si128((__m128i*){}.u8, _mm_xor_si128(_mm_or_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)), _mm_set1_epi32(-1)));",Add commentMore actions
+            v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
+        break;
+
     case PPC_INST_VOR:
     case PPC_INST_VOR128:
         print("\t_mm_store_si128((__m128i*){}.u8, ", v(insn.operands[0]));
@@ -2390,11 +2396,6 @@ bool Recompiler::Recompile(
         println("\t{}.u32 = {};", r(insn.operands[2]), ea());
         break;
         /*
-    case PPC_INST_FRSQRTE: //try not use simd::
-        printSetFlushMode(true);
-        println("\t{}.f64 = simd::rsqrt_f64({}.f64);", f(insn.operands[0]), f(insn.operands[1]));
-        break;
-
 
        
     case PPC_INST_LHBRX:
@@ -2425,6 +2426,22 @@ bool Recompiler::Recompile(
         if (insn.operands[1] != 0)
             print("{}.u32 + ", r(insn.operands[1]));
         println("{}.u32));", r(insn.operands[2]));
+        break;
+
+          case PPC_INST_VADDSWS:
+        //  vectorize - SSE doesn't have _mm_adds_epi32
+        for (size_t i = 0; i < 4; i++)
+        {
+            println("\t{}.s64 = int64_t({}.s32[{}]) + int64_t({}.s32[{}]);", temp(), v(insn.operands[1]), i, v(insn.operands[2]), i);
+            println("\t{}.s32[{}] = {}.s64 > INT_MAX ? INT_MAX : {}.s64 < INT_MIN ? INT_MIN : {}.s64;",
+                v(insn.operands[0]), i, temp(), temp(), temp());
+        }
+        break;
+
+         case PPC_INST_BDNZT:
+        //Same note as BDNZF but true instead of false
+        println("\t--{}.u64;", ctr());
+        println("\tif ({}.u32 != 0 && {}.eq) goto loc_{:X};", ctr(), cr(insn.operands[0] / 4), insn.operands[1]);
         break;
 
 
