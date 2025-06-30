@@ -1,4 +1,9 @@
 # XenonRecompUnlimited
+
+<p align="center">
+<img src="https://github.com/testdriveupgrade/XenonRecompUnlim/blob/main/recomp_scheme.jpg" width="512"/>
+ </p>
+
 XenonRecompUnlimited - it's special fork of XenonRecomp for TDU engine, like experimental fork-version with fresh updates
 
 (unfortunattely at this moment XenonRecomp updates long-term )
