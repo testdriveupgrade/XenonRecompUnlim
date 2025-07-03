@@ -1969,7 +1969,7 @@ bool Recompiler::Recompile(
 
     case PPC_INST_VNOR:
     case PPC_INST_VNOR128:
-        println("\t_mm_store_si128((__m128i*){}.u8, _mm_xor_si128(_mm_or_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)), _mm_set1_epi32(-1)));",Add commentMore actions
+        println("\t_mm_store_si128((__m128i*){}.u8, _mm_xor_si128(_mm_or_si128(_mm_load_si128((__m128i*){}.u8), _mm_load_si128((__m128i*){}.u8)), _mm_set1_epi32(-1));");
             v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
         break;
 
