@@ -1236,6 +1236,12 @@ bool Recompiler::Recompile(
         println("{}.u32);", r(insn.operands[2]));
         break;
 
+    case PPC_INST_LWZUX:
+        println("\t{} = {}.u32 + {}.u32;", ea(), r(insn.operands[1]), r(insn.operands[2]));
+        println("\t{}.u64 = PPC_LOAD_U32({});", r(insn.operands[0]), ea());
+        println("\t{}.u32 = {};", r(insn.operands[1]), ea());
+        break;
+
     case PPC_INST_MFCR:
         for (size_t i = 0; i < 32; i++)
         {
