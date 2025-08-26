@@ -7,6 +7,8 @@
 XenonRecompUnlimited - it's special fork of XenonRecomp for TDU engine, like experimental fork-version with fresh updates
 
 (unfortunattely at this moment XenonRecomp updates long-term )
+
+!!!Mac(ARM) branch without simd and can contain less PPC 
  
 Some  new commands of PowerPC CPU checked, but other experimental
 
